@@ -1,0 +1,5 @@
+user_id,name,email,phone,city,is_active
+101,Amit,amit@test.com,9999900001,Delhi,true
+102,Riya,riya@test.com,9999900002,Mumbai,true
+103,Sneha,sneha@test.com,9999900003,Delhi,true
+104,Rahul,rahul@test.com,9999900004,Bangalore,false
