@@ -3,26 +3,34 @@ import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { 
+  Users, Briefcase, Megaphone, LogOut, UploadCloud, 
+  Plus, Trash2, Edit2, Shield, Search, Power 
+} from 'lucide-react';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('USERS'); // Tabs: USERS, STAFF, CAMPAIGNS
+  const [activeTab, setActiveTab] = useState('USERS'); 
 
   // Data States
   const [users, setUsers] = useState([]);
   const [staff, setStaff] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   
-  // Form States
+  // UI States
+  const [searchTerm, setSearchTerm] = useState('');
+  const [editingUser, setEditingUser] = useState(null);
+  const [file, setFile] = useState(null);
+  
+  // Forms
   const [userData, setUserData] = useState({ name: '', email: '', password: '', city: '', phone: '' });
   const [staffData, setStaffData] = useState({ name: '', email: '', password: '', role: 'CREATOR' });
-  const [editingUser, setEditingUser] = useState(null); // ID of user being edited
-  const [file, setFile] = useState(null);
 
-  // Load Data
-  useEffect(() => {
-    fetchAllData();
-  }, []);
+  // Reporting (Admin View)
+  const [selectedCampaign, setSelectedCampaign] = useState(null);
+  const [recipients, setRecipients] = useState([]);
+
+  useEffect(() => { fetchAllData(); }, []);
 
   const fetchAllData = async () => {
     try {
@@ -34,218 +42,284 @@ const Dashboard = () => {
       setUsers(userRes.data);
       setStaff(staffRes.data);
       setCampaigns(campRes.data);
-    } catch (err) {
-      console.error("Error loading data", err);
-    }
+    } catch (err) { console.error("Error loading data", err); }
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate('/login');
-  };
+  const handleLogout = () => { localStorage.clear(); navigate('/login'); };
 
-  // --- TAB 1: USER LOGIC ---
+  // --- ACTIONS ---
   const handleUserSubmit = async (e) => {
     e.preventDefault();
     try {
-      if (editingUser) {
-        await api.put(`/admin/users/${editingUser}`, userData);
-        toast.success("User Updated!");
-      } else {
-        await api.post('/admin/users/create', userData);
-        toast.success("User Created!");
-      }
-      setUserData({ name: '', email: '', password: '', city: '', phone: '' });
-      setEditingUser(null);
-      fetchAllData();
-    } catch (err) { toast.error("Operation failed."); }
+      if(editingUser) await api.put(`/admin/users/${editingUser}`, userData);
+      else await api.post('/admin/users/create', userData);
+      toast.success(editingUser ? "User Updated!" : "User Created!");
+      setUserData({ name: '', email: '', password: '', city: '', phone: '' }); setEditingUser(null); fetchAllData();
+    } catch(err) { toast.error("Operation failed."); }
   };
 
-  const handleDeleteUser = async (id) => {
-    if(!window.confirm("Are you sure?")) return;
+  const handleDelete = async (endpoint, id) => {
+    if(!window.confirm("Are you sure? This cannot be undone.")) return;
+    try { await api.delete(`${endpoint}/${id}`); toast.success("Deleted!"); fetchAllData(); } catch(err){ toast.error("Failed."); }
+  };
+
+  // --- NEW: Toggle Status Logic ---
+  const handleToggleStatus = async (userId) => {
     try {
-      await api.delete(`/admin/users/${id}`);
-      toast.success("User Deleted");
-      fetchAllData();
-    } catch(err) { toast.error("Delete failed"); }
-  };
-
-  const startEditUser = (u) => {
-    setEditingUser(u.userId);
-    setUserData({ name: u.name, email: u.email, password: '', city: u.city, phone: u.phone });
+        await api.put(`/admin/users/${userId}/toggle-status`);
+        toast.success("Status Updated");
+        fetchAllData(); // Refresh list to show new color
+    } catch (err) {
+        toast.error("Update failed");
+    }
   };
 
   const handleUpload = async () => {
-    if (!file) return toast.error("Select file first");
-    const formData = new FormData();
-    formData.append('file', file);
-    try {
-      await api.post('/users/upload-csv', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      toast.success("CSV Uploaded!");
-      fetchAllData();
-    } catch(err) { toast.error("Upload failed"); }
+    if(!file) return toast.error("Select file!");
+    const fd = new FormData(); fd.append('file', file);
+    try { await api.post('/users/upload-csv', fd, {headers:{'Content-Type':'multipart/form-data'}}); toast.success("Uploaded!"); fetchAllData(); } catch(err){ toast.error("Failed."); }
   };
 
-  // --- TAB 2: STAFF LOGIC ---
   const handleCreateStaff = async (e) => {
     e.preventDefault();
-    try {
-      await api.post('/admin/create-staff', staffData);
-      toast.success("Staff Added!");
-      setStaffData({ name: '', email: '', password: '', role: 'CREATOR' });
-      fetchAllData();
-    } catch (err) { toast.error("Failed to add staff."); }
+    try { await api.post('/admin/create-staff', staffData); toast.success("Staff Added!"); fetchAllData(); } catch(err){ toast.error("Failed."); }
   };
 
-  const handleDeleteStaff = async (id) => {
-    if(!window.confirm("Delete this staff member?")) return;
-    try {
-      await api.delete(`/admin/${id}`);
-      toast.success("Staff Deleted");
-      fetchAllData();
-    } catch(err) { toast.error("Delete failed"); }
+  // --- REPORTING ---
+  const handleViewReport = async (camp) => {
+    setSelectedCampaign(camp);
+    try { const { data } = await api.get(`/campaigns/${camp.id}/recipients`); setRecipients(data); } catch(err){}
   };
 
-  // --- TAB 3: CAMPAIGN LOGIC ---
-  const handleDeleteCampaign = async (id) => {
-    if(!window.confirm("Delete campaign? This deletes all reports too.")) return;
-    try {
-      await api.delete(`/campaigns/${id}`);
-      toast.success("Campaign Deleted");
-      fetchAllData();
-    } catch(err) { toast.error("Delete failed"); }
+  const downloadCSV = () => {
+    const headers = "Name,Email,Status,Sent At\n";
+    const rows = recipients.map(r => `${r.name},${r.email},${r.status},${r.sentAt}`).join("\n");
+    const blob = new Blob([headers+rows], {type:'text/csv'});
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download=`Report.csv`; a.click();
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 font-sans pb-10">
-      <ToastContainer position="top-right" autoClose={2000} />
+    <div className="min-h-screen bg-gray-50 flex font-sans text-gray-800">
+      <ToastContainer position="top-right" autoClose={2000} theme="colored" />
       
-      <header className="bg-pink-600 text-white p-4 shadow-md flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Admin Control Panel</h1>
-        <div className="flex gap-4">
-            <button onClick={() => navigate('/creator-dashboard')} className="bg-white text-pink-600 px-4 py-2 rounded font-bold hover:bg-gray-100">🚀 Launch Campaign</button>
-            <button onClick={handleLogout} className="bg-pink-800 text-white px-4 py-2 rounded font-bold hover:bg-pink-700">Logout</button>
+      {/* --- SIDEBAR --- */}
+      <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col">
+        <div className="p-6 border-b border-gray-100">
+          <h2 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600">
+            Nykaa Admin
+          </h2>
         </div>
-      </header>
-
-      {/* TABS */}
-      <div className="max-w-6xl mx-auto mt-6 flex gap-4 border-b-2 border-gray-300 pb-2 px-4 overflow-x-auto">
-        {['USERS', 'STAFF', 'CAMPAIGNS'].map(tab => (
-            <button 
-                key={tab} 
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 font-bold rounded transition ${activeTab === tab ? 'bg-pink-600 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
-            >
-                Manage {tab}
-            </button>
-        ))}
-      </div>
-
-      <div className="max-w-6xl mx-auto mt-6 p-4">
         
+        <nav className="flex-1 p-4 space-y-2">
+          {[
+            { id: 'USERS', icon: Users, label: 'Customer Base' },
+            { id: 'STAFF', icon: Briefcase, label: 'Staff Management' },
+            { id: 'CAMPAIGNS', icon: Megaphone, label: 'Campaigns' },
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${
+                activeTab === item.id 
+                ? 'bg-pink-50 text-pink-700 shadow-sm' 
+                : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <item.icon className="w-5 h-5" />
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="p-4 border-t border-gray-100">
+          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl transition font-medium">
+            <LogOut className="w-5 h-5" /> Logout
+          </button>
+        </div>
+      </aside>
+
+      {/* --- MAIN CONTENT --- */}
+      <main className="flex-1 p-8 overflow-y-auto">
+        <header className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">
+              {activeTab === 'USERS' && 'Customer Management'}
+              {activeTab === 'STAFF' && 'Staff Directory'}
+              {activeTab === 'CAMPAIGNS' && 'System Campaigns'}
+            </h1>
+            <p className="text-gray-500 text-sm mt-1">Manage and organize your system data.</p>
+          </div>
+          <button 
+            onClick={() => navigate('/creator-dashboard')}
+            className="flex items-center gap-2 bg-gradient-to-r from-pink-600 to-purple-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg hover:shadow-xl hover:scale-105 transition"
+          >
+            <Plus className="w-5 h-5" /> Launch Campaign
+          </button>
+        </header>
+
         {/* === TAB 1: USERS === */}
         {activeTab === 'USERS' && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded shadow h-fit animate-fade-in-up">
-                    <h3 className="font-bold text-lg mb-4 text-pink-600">{editingUser ? 'Edit User' : 'Add New User'}</h3>
-                    <form onSubmit={handleUserSubmit} className="space-y-3">
-                        <input type="text" placeholder="Name" className="w-full border p-2 rounded" value={userData.name} onChange={e => setUserData({...userData, name: e.target.value})} required />
-                        <input type="email" placeholder="Email" className="w-full border p-2 rounded" value={userData.email} onChange={e => setUserData({...userData, email: e.target.value})} required />
-                        <input type="password" placeholder="Password" className="w-full border p-2 rounded" value={userData.password} onChange={e => setUserData({...userData, password: e.target.value})} />
-                        <input type="text" placeholder="Phone" className="w-full border p-2 rounded" value={userData.phone} onChange={e => setUserData({...userData, phone: e.target.value})} />
-                        <input type="text" placeholder="City" className="w-full border p-2 rounded" value={userData.city} onChange={e => setUserData({...userData, city: e.target.value})} />
-                        <button className="w-full bg-indigo-600 text-white py-2 rounded font-bold hover:bg-indigo-700">{editingUser ? 'Update User' : 'Create User'}</button>
-                        {editingUser && <button type="button" onClick={() => {setEditingUser(null); setUserData({ name: '', email: '', password: '', city: '', phone: '' })}} className="w-full mt-2 text-gray-500 underline">Cancel Edit</button>}
-                    </form>
-                    
-                    <div className="mt-8 pt-4 border-t">
-                        <h4 className="font-bold text-sm mb-2">Or Bulk Upload CSV</h4>
-                        <div className="flex gap-2">
-                            <input type="file" className="text-xs w-full" onChange={e => setFile(e.target.files[0])} />
-                            <button onClick={handleUpload} className="bg-green-600 text-white px-2 py-1 text-xs rounded hover:bg-green-700">Upload</button>
-                        </div>
-                    </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Form Card */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
+              <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <Plus className="w-5 h-5 text-pink-500" /> {editingUser ? 'Edit User' : 'Add New User'}
+              </h3>
+              <form onSubmit={handleUserSubmit} className="space-y-4">
+                <input type="text" placeholder="Full Name" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-pink-500 outline-none transition" value={userData.name} onChange={e => setUserData({...userData, name: e.target.value})} required />
+                <input type="email" placeholder="Email Address" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-pink-500 outline-none transition" value={userData.email} onChange={e => setUserData({...userData, email: e.target.value})} required />
+                <input type="password" placeholder="Password" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-pink-500 outline-none transition" value={userData.password} onChange={e => setUserData({...userData, password: e.target.value})} />
+                <div className="grid grid-cols-2 gap-2">
+                    <input type="text" placeholder="Phone" className="bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" value={userData.phone} onChange={e => setUserData({...userData, phone: e.target.value})} />
+                    <input type="text" placeholder="City" className="bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" value={userData.city} onChange={e => setUserData({...userData, city: e.target.value})} />
                 </div>
-
-                <div className="bg-white p-6 rounded shadow md:col-span-2 overflow-y-auto max-h-[80vh] animate-fade-in-up delay-100">
-                    <h3 className="font-bold text-lg mb-4 text-gray-700">All Customers ({users.length})</h3>
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-100 sticky top-0"><tr><th className="p-2">Name</th><th className="p-2">Email</th><th className="p-2">Actions</th></tr></thead>
-                        <tbody>
-                            {users.map(u => (
-                                <tr key={u.userId} className="border-b hover:bg-gray-50">
-                                    <td className="p-2">{u.name}</td>
-                                    <td className="p-2">{u.email}</td>
-                                    <td className="p-2 flex gap-3">
-                                        <button onClick={() => startEditUser(u)} className="text-blue-600 font-bold hover:underline">Edit</button>
-                                        <button onClick={() => handleDeleteUser(u.userId)} className="text-red-600 font-bold hover:underline">Delete</button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <button className="w-full bg-gray-900 text-white py-3 rounded-xl font-bold hover:bg-black transition">
+                  {editingUser ? 'Save Changes' : 'Create User'}
+                </button>
+              </form>
+              
+              <div className="mt-6 pt-6 border-t border-gray-100">
+                <h4 className="text-sm font-bold text-gray-600 mb-3 flex items-center gap-2"><UploadCloud className="w-4 h-4"/> Bulk Import</h4>
+                <div className="flex gap-2">
+                  <input type="file" className="text-xs w-full text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100" onChange={e => setFile(e.target.files[0])} />
+                  <button onClick={handleUpload} className="bg-green-600 text-white px-3 py-1 rounded-lg text-xs font-bold hover:bg-green-700">Upload</button>
                 </div>
+              </div>
             </div>
+
+            {/* Table Card */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 lg:col-span-2 overflow-hidden">
+               <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                  <span className="font-bold text-gray-600">Total Users: {users.length}</span>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2 w-4 h-4 text-gray-400" />
+                    <input type="text" placeholder="Search..." className="pl-9 pr-4 py-1.5 rounded-full border border-gray-200 text-sm focus:outline-none focus:border-pink-500" onChange={(e) => setSearchTerm(e.target.value)} />
+                  </div>
+               </div>
+               <div className="overflow-x-auto">
+                 <table className="w-full text-sm text-left">
+                   <thead className="bg-white text-gray-500 border-b">
+                     <tr><th className="p-4 font-semibold">User</th><th className="p-4 font-semibold">Status</th><th className="p-4 font-semibold text-right">Actions</th></tr>
+                   </thead>
+                   <tbody className="divide-y divide-gray-100">
+                     {users.filter(u => u.name.toLowerCase().includes(searchTerm.toLowerCase())).map(u => (
+                       <tr key={u.userId} className={`hover:bg-gray-50 transition ${!u.active ? 'opacity-60 bg-gray-50' : ''}`}>
+                         <td className="p-4">
+                           <div className="font-bold text-gray-900">{u.name}</div>
+                           <div className="text-xs text-gray-500">{u.email}</div>
+                         </td>
+                         <td className="p-4">
+                            {/* --- STATUS BADGE --- */}
+                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${u.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                {u.active ? 'Active' : 'Inactive'}
+                            </span>
+                         </td>
+                         <td className="p-4 flex justify-end gap-2">
+                           
+                           {/* --- TOGGLE BUTTON --- */}
+                           <button 
+                             onClick={() => handleToggleStatus(u.userId)} 
+                             title={u.active ? "Deactivate User" : "Activate User"}
+                             className={`p-2 rounded-lg transition ${u.active ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-200'}`}
+                           >
+                                <Power className="w-4 h-4"/>
+                           </button>
+
+                           <button onClick={() => {setEditingUser(u.userId); setUserData(u);}} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Edit2 className="w-4 h-4"/></button>
+                           <button onClick={() => handleDelete('/admin/users', u.userId)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
+                         </td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+               </div>
+            </div>
+          </div>
         )}
 
         {/* === TAB 2: STAFF === */}
         {activeTab === 'STAFF' && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded shadow h-fit animate-fade-in-up">
-                    <h3 className="font-bold text-lg mb-4 text-pink-600">Add Staff Member</h3>
-                    <form onSubmit={handleCreateStaff} className="space-y-3">
-                        <input type="text" placeholder="Name" className="w-full border p-2 rounded" value={staffData.name} onChange={e => setStaffData({...staffData, name: e.target.value})} required />
-                        <input type="email" placeholder="Email" className="w-full border p-2 rounded" value={staffData.email} onChange={e => setStaffData({...staffData, email: e.target.value})} required />
-                        <input type="password" placeholder="Password" className="w-full border p-2 rounded" value={staffData.password} onChange={e => setStaffData({...staffData, password: e.target.value})} required />
-                        <select className="w-full border p-2 rounded bg-white" value={staffData.role} onChange={e => setStaffData({...staffData, role: e.target.value})}>
-                            <option value="CREATOR">Creator</option>
-                            <option value="VIEWER">Viewer</option>
-                        </select>
-                        <button className="w-full bg-purple-600 text-white py-2 rounded font-bold hover:bg-purple-700">Add Staff</button>
-                    </form>
-                </div>
-                <div className="bg-white p-6 rounded shadow md:col-span-2 animate-fade-in-up delay-100">
-                    <h3 className="font-bold text-lg mb-4 text-gray-700">Staff Directory</h3>
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-100"><tr><th className="p-2">Name</th><th className="p-2">Email</th><th className="p-2">Role</th><th className="p-2">Action</th></tr></thead>
-                        <tbody>
-                            {staff.map(s => (
-                                <tr key={s.id} className="border-b hover:bg-gray-50">
-                                    <td className="p-2">{s.name}</td>
-                                    <td className="p-2">{s.email}</td>
-                                    <td className="p-2"><span className="bg-gray-200 px-2 rounded text-xs font-bold text-gray-600">{s.role}</span></td>
-                                    <td className="p-2"><button onClick={() => handleDeleteStaff(s.id)} className="text-red-600 font-bold hover:underline">Remove</button></td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
+                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                   <Shield className="w-5 h-5 text-purple-600" /> Hire Staff
+                </h3>
+                <form onSubmit={handleCreateStaff} className="space-y-4">
+                   <input type="text" placeholder="Name" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" value={staffData.name} onChange={e => setStaffData({...staffData, name: e.target.value})} required />
+                   <input type="email" placeholder="Email" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" value={staffData.email} onChange={e => setStaffData({...staffData, email: e.target.value})} required />
+                   <input type="password" placeholder="Password" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" value={staffData.password} onChange={e => setStaffData({...staffData, password: e.target.value})} required />
+                   <select className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" value={staffData.role} onChange={e => setStaffData({...staffData, role: e.target.value})}>
+                      <option value="CREATOR">Creator (Can Launch Campaigns)</option>
+                      <option value="VIEWER">Viewer (Read Only)</option>
+                   </select>
+                   <button className="w-full bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700 transition">Add Member</button>
+                </form>
+             </div>
+             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 lg:col-span-2 overflow-hidden">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-gray-50 text-gray-500"><tr><th className="p-4">Staff Member</th><th className="p-4">Role</th><th className="p-4 text-right">Remove</th></tr></thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {staff.map(s => (
+                      <tr key={s.id} className="hover:bg-gray-50">
+                        <td className="p-4"><div className="font-bold">{s.name}</div><div className="text-xs text-gray-500">{s.email}</div></td>
+                        <td className="p-4"><span className={`px-2 py-1 rounded-md text-xs font-bold ${s.role==='CREATOR'?'bg-purple-100 text-purple-700':'bg-blue-100 text-blue-700'}`}>{s.role}</span></td>
+                        <td className="p-4 text-right"><button onClick={() => handleDelete('/admin', s.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg"><Trash2 className="w-4 h-4"/></button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+             </div>
+           </div>
         )}
 
         {/* === TAB 3: CAMPAIGNS === */}
         {activeTab === 'CAMPAIGNS' && (
-            <div className="bg-white p-6 rounded shadow animate-fade-in-up">
-                <h3 className="font-bold text-lg mb-4 text-gray-700">System Campaign History</h3>
-                <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-100"><tr><th className="p-2">Name</th><th className="p-2">Type</th><th className="p-2">Date</th><th className="p-2">Action</th></tr></thead>
-                    <tbody>
-                        {campaigns.map(c => (
-                            <tr key={c.id} className="border-b hover:bg-gray-50">
-                                <td className="p-2 font-medium">{c.campaignName}</td>
-                                <td className="p-2"><span className="bg-gray-200 px-2 rounded text-xs font-bold">{c.type}</span></td>
-                                <td className="p-2 text-gray-500">{new Date(c.createdAt).toLocaleDateString()}</td>
-                                <td className="p-2">
-                                    <button onClick={() => handleDeleteCampaign(c.id)} className="text-red-600 font-bold hover:underline">Delete</button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+             <table className="w-full text-sm text-left">
+               <thead className="bg-gray-50 text-gray-500"><tr><th className="p-4">Campaign</th><th className="p-4">Date</th><th className="p-4 text-right">Actions</th></tr></thead>
+               <tbody className="divide-y divide-gray-100">
+                 {campaigns.map(c => (
+                   <tr key={c.id} className="hover:bg-gray-50">
+                     <td className="p-4">
+                       <div className="font-bold text-gray-900">{c.campaignName}</div>
+                       <span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600">{c.type}</span>
+                     </td>
+                     <td className="p-4 text-gray-500">{new Date(c.createdAt).toLocaleDateString()}</td>
+                     <td className="p-4 flex justify-end gap-3">
+                       <button onClick={() => handleViewReport(c)} className="text-purple-600 hover:underline text-xs font-bold">View Report</button>
+                       <button onClick={() => handleDelete('/campaigns', c.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg"><Trash2 className="w-4 h-4"/></button>
+                     </td>
+                   </tr>
+                 ))}
+               </tbody>
+             </table>
+          </div>
         )}
+      </main>
 
-      </div>
+      {/* MODAL */}
+      {selectedCampaign && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center p-4 z-50">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+             <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white p-4 flex justify-between items-center">
+                <h3 className="font-bold">Report: {selectedCampaign.campaignName}</h3>
+                <button onClick={() => setSelectedCampaign(null)} className="text-gray-400 hover:text-white">✕</button>
+             </div>
+             <div className="p-6 max-h-80 overflow-y-auto">
+                {recipients.length === 0 ? <p className="text-center text-gray-500">No data found.</p> : (
+                  <table className="w-full text-sm text-left">
+                     <thead className="bg-gray-50"><tr><th className="p-2">Name</th><th className="p-2">Email</th><th className="p-2">Status</th></tr></thead>
+                     <tbody>{recipients.map((r,i)=><tr key={i} className="border-b"><td className="p-2">{r.name}</td><td className="p-2">{r.email}</td><td className="p-2 text-green-600 font-bold">{r.status}</td></tr>)}</tbody>
+                  </table>
+                )}
+             </div>
+             <div className="p-4 border-t flex justify-end bg-gray-50">
+                <button onClick={downloadCSV} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-green-700 shadow-lg">Download CSV</button>
+             </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

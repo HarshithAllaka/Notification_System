@@ -26,12 +26,23 @@ public class CampaignService {
         campaign.setCampaignName(request.getName());
         campaign.setType(request.getType());
         campaign.setContent(request.getContent());
+        campaign.setTargetCity(request.getTargetCity()); // Save the city filter
         campaign.setCreatedAt(LocalDateTime.now());
         campaignRepository.save(campaign);
 
         List<User> users = userRepository.findAll();
         for (User user : users) {
             if (!user.isActive()) continue;
+
+            // --- NEW CITY FILTER LOGIC ---
+            // If a target city is set, AND the user's city doesn't match, SKIP them.
+            if (request.getTargetCity() != null && !request.getTargetCity().trim().isEmpty()) {
+                if (user.getCity() == null || !user.getCity().equalsIgnoreCase(request.getTargetCity().trim())) {
+                    continue; 
+                }
+            }
+            // -----------------------------
+
             Preference pref = preferenceRepository.findByUserUserId(user.getUserId());
             if (pref == null) continue;
 
@@ -52,9 +63,8 @@ public class CampaignService {
         }
     }
 
-    public List<Campaign> getAllCampaigns() {
-        return campaignRepository.findAll();
-    }
+    // ... (Keep existing getAllCampaigns, getRecipients, deleteCampaign methods exactly as they were) ...
+    public List<Campaign> getAllCampaigns() { return campaignRepository.findAll(); }
 
     public List<RecipientDto> getCampaignRecipients(Long campaignId) {
         List<NotificationLog> logs = logRepository.findByCampaignId(campaignId);
@@ -74,7 +84,7 @@ public class CampaignService {
         campaignRepository.deleteById(id);
     }
 
-    // --- NEW UPDATE METHOD ---
+    // Update Campaign with City support
     public Campaign updateCampaign(Long id, CampaignRequest request) {
         Campaign existing = campaignRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Campaign not found"));
@@ -82,6 +92,7 @@ public class CampaignService {
         existing.setCampaignName(request.getName());
         existing.setType(request.getType());
         existing.setContent(request.getContent());
+        existing.setTargetCity(request.getTargetCity()); // Update city
         
         return campaignRepository.save(existing);
     }

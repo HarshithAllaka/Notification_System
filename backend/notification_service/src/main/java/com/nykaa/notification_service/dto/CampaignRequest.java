@@ -5,7 +5,8 @@ import lombok.Data;
 @Data
 public class CampaignRequest {
     private String name;
-    private String type; // EMAIL, SMS, PUSH
+    private String type;
     private String content;
-    private String schedule; // Optional
+    private String schedule;
+    private String targetCity; // <--- ADD THIS
 }

@@ -5,21 +5,20 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Entity
+@Data
 @Table(name = "campaigns")
-@Data // Generates getters, setters, toString, etc.
 public class Campaign {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private String campaignName;
-
-    // --- NEW FIELDS ADDED ---
-    private String type;     // EMAIL, SMS, PUSH
+    private String type; // EMAIL, SMS, PUSH
     
-    @Column(length = 1000)   // Allow longer text for messages
-    private String content;  
+    @Column(length = 1000)
+    private String content;
+    
+    private String targetCity; // <--- ADD THIS
     
     private LocalDateTime createdAt;
 }

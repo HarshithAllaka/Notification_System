@@ -8,6 +8,7 @@ import com.nykaa.notification_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -19,7 +20,7 @@ public class UserService {
     private final PreferenceRepository preferenceRepository;
     private final PasswordEncoder passwordEncoder;
 
-    // --- EXISTING METHODS (Keep these) ---
+    // --- 1. Register User (Public Sign Up) ---
     public User registerUser(User user) {
         if (userRepository.findByEmail(user.getEmail()).isPresent()) {
             throw new RuntimeException("Email already exists");
@@ -28,25 +29,53 @@ public class UserService {
         user.setRole(Role.USER);
         User savedUser = userRepository.save(user);
 
-        // Create Default Preferences
+        createDefaultPreferences(savedUser); // Helper method
+        return savedUser;
+    }
+
+    // --- 2. Create User Manually (Admin Dashboard) ---
+    public User createUserManually(User user) {
+        if (userRepository.findByEmail(user.getEmail()).isPresent()) {
+            throw new RuntimeException("Email already exists");
+        }
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        
+        if (user.getRole() == null) user.setRole(Role.USER);
+        if (user.getUserId() == null) user.setUserId(UUID.randomUUID().toString());
+        user.setActive(true); // Default to active
+        
+        User savedUser = userRepository.save(user);
+
+        createDefaultPreferences(savedUser); // Ensures they get notifications!
+        return savedUser;
+    }
+
+    // --- Helper to avoid code duplication ---
+    private void createDefaultPreferences(User user) {
         Preference pref = new Preference();
-        pref.setUser(savedUser);
+        pref.setUser(user);
         pref.setOffers(true);
         pref.setNewsletter(true);
         pref.setOrderUpdates(true);
         preferenceRepository.save(pref);
-
-        return savedUser;
     }
 
+    // --- 3. Get User Profile ---
     public User getUserProfile(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
+    // --- 4. Update Preferences ---
     public User updatePreferences(String email, Preference updatedPref) {
         User user = getUserProfile(email);
         Preference pref = user.getPreference();
+        
+        if (pref == null) { // Safety check
+            pref = new Preference();
+            pref.setUser(user);
+        }
+
         pref.setOffers(updatedPref.isOffers());
         pref.setNewsletter(updatedPref.isNewsletter());
         pref.setOrderUpdates(updatedPref.isOrderUpdates());
@@ -54,32 +83,10 @@ public class UserService {
         return user;
     }
 
-    // --- NEW ADMIN METHODS ---
+    // --- ADMIN METHODS ---
 
     public List<User> getAllUsers() {
         return userRepository.findAll();
-    }
-
-    public User createUserManually(User user) {
-        if (userRepository.findByEmail(user.getEmail()).isPresent()) {
-            throw new RuntimeException("Email already exists");
-        }
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
-        if (user.getRole() == null) user.setRole(Role.USER);
-        if (user.getUserId() == null) user.setUserId(UUID.randomUUID().toString());
-        
-        // Save User
-        User savedUser = userRepository.save(user);
-
-        // Create Preferences for them immediately
-        Preference pref = new Preference();
-        pref.setUser(savedUser);
-        pref.setOffers(true);
-        pref.setNewsletter(true);
-        pref.setOrderUpdates(true);
-        preferenceRepository.save(pref);
-
-        return savedUser;
     }
 
     public User updateUser(String userId, User updatedData) {
@@ -91,7 +98,6 @@ public class UserService {
         existing.setPhone(updatedData.getPhone());
         existing.setCity(updatedData.getCity());
         
-        // Only update password if a new one is provided
         if (updatedData.getPassword() != null && !updatedData.getPassword().isEmpty()) {
             existing.setPassword(passwordEncoder.encode(updatedData.getPassword()));
         }
@@ -100,5 +106,16 @@ public class UserService {
 
     public void deleteUser(String userId) {
         userRepository.deleteById(userId);
+    }
+
+    // --- NEW: Toggle Active Status ---
+    public String toggleUserActiveStatus(String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        user.setActive(!user.isActive()); // Flip status
+        userRepository.save(user);
+        
+        return user.isActive() ? "User Activated" : "User Deactivated";
     }
 }
