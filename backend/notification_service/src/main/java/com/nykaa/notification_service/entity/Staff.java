@@ -1,19 +1,29 @@
 package com.nykaa.notification_service.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "staff_users")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor
+@Data // <--- This annotation automatically generates setName(), getName(), etc.
+@NoArgsConstructor
+@AllArgsConstructor
 public class Staff {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(unique = true, nullable = false)
+
+    // --- THIS WAS MISSING ---
+    private String name; 
+
+    @Column(unique = true)
     private String email;
-    @Column(nullable = false)
+
     private String password;
+
     @Enumerated(EnumType.STRING)
     private Role role;
 }

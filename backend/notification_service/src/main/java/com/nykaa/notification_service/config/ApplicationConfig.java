@@ -1,31 +1,64 @@
 package com.nykaa.notification_service.config;
 
+import com.nykaa.notification_service.entity.Staff;
+import com.nykaa.notification_service.entity.User;
 import com.nykaa.notification_service.repository.StaffRepository;
+import com.nykaa.notification_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.Optional;
+
 @Configuration
 @RequiredArgsConstructor
 public class ApplicationConfig {
 
-    private final StaffRepository repository;
+    private final StaffRepository staffRepository;
+    private final UserRepository userRepository;
 
     @Bean
     public UserDetailsService userDetailsService() {
-        return username -> repository.findByEmail(username)
-                .map(staff -> org.springframework.security.core.userdetails.User.builder()
-                        .username(staff.getEmail())
-                        .password(staff.getPassword())
-                        .authorities(staff.getRole().name())
-                        .build())
-                .orElseThrow(() -> new UsernameNotFoundException("Staff not found"));
+        return username -> {
+            // 1. Try Staff
+            Optional<Staff> staff = staffRepository.findByEmail(username);
+            if (staff.isPresent()) {
+                return org.springframework.security.core.userdetails.User.builder()
+                        .username(staff.get().getEmail())
+                        .password(staff.get().getPassword())
+                        .authorities(staff.get().getRole().name())
+                        .build();
+            }
+
+            // 2. Try User
+            Optional<User> user = userRepository.findByEmail(username);
+            if (user.isPresent()) {
+                return org.springframework.security.core.userdetails.User.builder()
+                        .username(user.get().getEmail())
+                        .password(user.get().getPassword())
+                        .authorities(user.get().getRole().name())
+                        .build();
+            }
+
+            throw new UsernameNotFoundException("User not found");
+        };
+    }
+
+    // --- THIS WAS MISSING AND CAUSED THE ERROR ---
+    @Bean
+    public AuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+        authProvider.setUserDetailsService(userDetailsService());
+        authProvider.setPasswordEncoder(passwordEncoder());
+        return authProvider;
     }
 
     @Bean

@@ -1,20 +1,24 @@
 package com.nykaa.notification_service.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Data;
 
 @Entity
 @Table(name = "preferences")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor
+@Data
 public class Preference {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private boolean offers = false;
-    private boolean orderUpdates = false;
-    private boolean newsletter = false;
+
+    private boolean offers;
+    private boolean newsletter;
+    private boolean orderUpdates;
 
     @OneToOne
     @JoinColumn(name = "user_id")
+    @JsonIgnore // Prevents Infinite Loop
     private User user;
 }

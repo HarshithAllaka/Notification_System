@@ -1,43 +1,82 @@
 package com.nykaa.notification_service.controller;
 
-import com.nykaa.notification_service.entity.User;
-import com.nykaa.notification_service.service.UserService;
-import com.nykaa.notification_service.service.CsvService;
+import com.nykaa.notification_service.dto.NotificationDto;
+import com.nykaa.notification_service.entity.NotificationLog;
+import com.nykaa.notification_service.entity.Preference;
+import com.nykaa.notification_service.entity.Campaign;
+import com.nykaa.notification_service.repository.CampaignRepository;
+import com.nykaa.notification_service.repository.NotificationLogRepository;
+import com.nykaa.notification_service.repository.PreferenceRepository;
+import com.nykaa.notification_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
 public class UserController {
 
-    private final UserService userService;
-    private final CsvService csvService;
+    private final UserRepository userRepository;
+    private final PreferenceRepository preferenceRepository;
+    private final NotificationLogRepository logRepository;
+    private final CampaignRepository campaignRepository;
 
-    @PostMapping("/bulk")
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'CREATOR')")
-    public ResponseEntity<String> uploadUsers(@RequestBody List<User> users) {
-        if (users.size() > 50) {
-            return ResponseEntity.badRequest().body("Use CSV upload for more than 50 users.");
-        }
-        userService.saveUsers(users);
-        return ResponseEntity.ok("Users uploaded successfully.");
+    // Helper to get current logged-in user's email from the security token
+    private String getCurrentUserEmail() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth.getName();
     }
 
-    @PostMapping("/upload-csv")
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'CREATOR')")
-    public ResponseEntity<String> uploadCsv(@RequestParam("file") MultipartFile file) {
-        try {
-            List<User> users = csvService.parseCsv(file);
-            userService.saveUsers(users);
-            return ResponseEntity.ok("Bulk upload successful for " + users.size() + " users.");
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Error processing CSV: " + e.getMessage());
-        }
+    // 1. Get My Preferences
+    @GetMapping("/preferences")
+    public ResponseEntity<Preference> getMyPreferences() {
+        String email = getCurrentUserEmail();
+        // Find the user ID based on email
+        String userId = userRepository.findByEmail(email).get().getUserId();
+        // Use the repository we just created
+        return ResponseEntity.ok(preferenceRepository.findByUserUserId(userId));
+    }
+
+    // 2. Update My Preferences
+    @PutMapping("/preferences")
+    public ResponseEntity<Preference> updatePreferences(@RequestBody Preference updatedPref) {
+        String email = getCurrentUserEmail();
+        String userId = userRepository.findByEmail(email).get().getUserId();
+        
+        Preference existing = preferenceRepository.findByUserUserId(userId);
+        existing.setOffers(updatedPref.isOffers());
+        existing.setNewsletter(updatedPref.isNewsletter());
+        existing.setOrderUpdates(updatedPref.isOrderUpdates());
+        
+        return ResponseEntity.ok(preferenceRepository.save(existing));
+    }
+
+    // 3. Get My Notifications (Messages)
+    @GetMapping("/notifications")
+    public ResponseEntity<List<NotificationDto>> getMyNotifications() {
+        String email = getCurrentUserEmail();
+        String userId = userRepository.findByEmail(email).get().getUserId();
+
+        // Find logs specifically for this user
+        List<NotificationLog> logs = logRepository.findAll().stream()
+                .filter(log -> log.getUserId().equals(userId))
+                .collect(Collectors.toList());
+
+        // Convert logs to DTOs (Get the Campaign Name for each log)
+        List<NotificationDto> notifications = logs.stream().map(log -> {
+            Campaign c = campaignRepository.findById(log.getCampaignId()).orElse(null);
+            NotificationDto dto = new NotificationDto();
+            dto.setMessage(c != null ? c.getCampaignName() : "Unknown Message");
+            dto.setReceivedAt(log.getSentAt());
+            return dto;
+        }).collect(Collectors.toList());
+
+        return ResponseEntity.ok(notifications);
     }
 }
