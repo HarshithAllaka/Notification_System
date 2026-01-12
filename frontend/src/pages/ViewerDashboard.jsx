@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
-import { LogOut, BarChart3, Download, FileText, Calendar, MapPin } from 'lucide-react';
+import { LogOut, BarChart3, Download, FileText, Calendar, Filter, Tag, Mail, ShoppingBag } from 'lucide-react';
 
 const ViewerDashboard = () => {
   const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState([]);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [recipients, setRecipients] = useState([]);
+  const [filterType, setFilterType] = useState('ALL'); // <--- NEW
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -30,6 +31,19 @@ const ViewerDashboard = () => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `${selectedCampaign.campaignName}_Report.csv`; a.click();
   };
+
+  // --- FILTER LOGIC ---
+  const getFilteredCampaigns = () => {
+    if (filterType === 'ALL') return campaigns;
+    return campaigns.filter(c => c.type === filterType);
+  };
+
+  const filters = [
+      { id: 'ALL', label: 'All', icon: Filter },
+      { id: 'SMS', label: 'Promotions', icon: Tag },
+      { id: 'EMAIL', label: 'Newsletters', icon: Mail },
+      { id: 'PUSH', label: 'Orders', icon: ShoppingBag },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50 flex font-sans text-gray-800">
@@ -54,14 +68,27 @@ const ViewerDashboard = () => {
             <p className="text-gray-500 mt-1">View historical data and download delivery reports.</p>
          </header>
 
+         {/* FILTERS */}
+         <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+            {filters.map(f => (
+                <button key={f.id} onClick={() => setFilterType(f.id)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition whitespace-nowrap ${filterType === f.id ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-blue-50'}`}>
+                    <f.icon className="w-4 h-4"/> {f.label}
+                </button>
+            ))}
+         </div>
+
          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <table className="w-full text-sm text-left">
                <thead className="bg-gray-50 text-gray-500"><tr><th className="p-4">Campaign Name</th><th className="p-4">Type</th><th className="p-4">Sent Date</th><th className="p-4">Actions</th></tr></thead>
                <tbody className="divide-y divide-gray-100">
-                 {campaigns.map((c, i) => (
+                 {getFilteredCampaigns().map((c, i) => (
                    <tr key={i} className="hover:bg-gray-50 transition">
                       <td className="p-4 font-bold text-gray-900">{c.campaignName}</td>
-                      <td className="p-4"><span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs uppercase font-bold">{c.type}</span></td>
+                      <td className="p-4">
+                         <span className={`px-2 py-1 rounded text-xs uppercase font-bold ${c.type==='SMS'?'bg-blue-100 text-blue-700':c.type==='EMAIL'?'bg-yellow-100 text-yellow-700':'bg-green-100 text-green-700'}`}>
+                             {c.type==='SMS'?'PROMO':c.type==='EMAIL'?'NEWS':'ORDER'}
+                         </span>
+                      </td>
                       <td className="p-4 text-gray-500 flex items-center gap-2"><Calendar className="w-4 h-4 text-gray-400"/> {new Date(c.createdAt).toLocaleDateString()}</td>
                       <td className="p-4">
                          <button onClick={() => handleViewReport(c)} className="flex items-center gap-2 text-blue-600 font-bold hover:underline"><FileText className="w-4 h-4"/> View Report</button>

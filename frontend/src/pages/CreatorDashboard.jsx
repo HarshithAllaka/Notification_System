@@ -5,7 +5,8 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { 
   PenTool, Users, LogOut, Send, LayoutDashboard, 
-  MapPin, MessageSquare, Plus, Edit2, FileText, Download 
+  MapPin, MessageSquare, Plus, Edit2, FileText, Download,
+  Tag, Mail, ShoppingBag, Filter
 } from 'lucide-react';
 
 const CreatorDashboard = () => {
@@ -18,6 +19,7 @@ const CreatorDashboard = () => {
     name: '', type: 'SMS', content: '', schedule: '', targetCity: '' 
   });
   const [editingCampaign, setEditingCampaign] = useState(null); 
+  const [filterType, setFilterType] = useState('ALL'); // <--- NEW FILTER STATE
   
   // User State
   const [users, setUsers] = useState([]);
@@ -98,12 +100,18 @@ const CreatorDashboard = () => {
     const a = document.createElement('a'); a.href = url; a.download = `${selectedCampaign.campaignName}_Report.csv`; a.click();
   };
 
-  const getTypeName = (type) => {
-    if (type === 'SMS') return 'Promotional Offer';
-    if (type === 'EMAIL') return 'Newsletter';
-    if (type === 'PUSH') return 'Order Update';
-    return type;
+  // --- FILTER HELPER ---
+  const getFilteredCampaigns = () => {
+    if (filterType === 'ALL') return campaigns;
+    return campaigns.filter(c => c.type === filterType);
   };
+
+  const filters = [
+      { id: 'ALL', label: 'All', icon: Filter },
+      { id: 'SMS', label: 'Promotions', icon: Tag },
+      { id: 'EMAIL', label: 'Newsletters', icon: Mail },
+      { id: 'PUSH', label: 'Orders', icon: ShoppingBag },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50 flex font-sans text-gray-800">
@@ -176,35 +184,49 @@ const CreatorDashboard = () => {
             </div>
 
             {/* List */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 lg:col-span-2 overflow-hidden">
-               <div className="p-4 border-b border-gray-100 bg-gray-50 font-bold text-gray-700">Recent Campaigns</div>
-               <div className="overflow-x-auto">
-                 <table className="w-full text-sm text-left">
-                   <thead className="text-gray-500 border-b"><tr><th className="p-4">Campaign Details</th><th className="p-4">Target</th><th className="p-4 text-right">Actions</th></tr></thead>
-                   <tbody className="divide-y divide-gray-100">
-                     {campaigns.map((c, i) => (
-                       <tr key={i} className="hover:bg-gray-50 transition">
-                         <td className="p-4">
-                           <div className="font-bold text-gray-900">{c.campaignName}</div>
-                           <div className="flex items-center gap-2 mt-1">
-                              <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${c.type==='SMS'?'bg-blue-100 text-blue-700':c.type==='EMAIL'?'bg-yellow-100 text-yellow-700':'bg-green-100 text-green-700'}`}>{getTypeName(c.type)}</span>
-                              <span className="text-xs text-gray-400">{new Date(c.createdAt).toLocaleDateString()}</span>
-                           </div>
-                         </td>
-                         <td className="p-4 text-gray-600 flex items-center gap-1"><MapPin className="w-3 h-3"/> {c.targetCity || "Global"}</td>
-                         <td className="p-4 text-right space-x-2">
-                           <button onClick={() => startEditCampaign(c)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 className="w-4 h-4"/></button>
-                           <button onClick={() => handleViewReport(c)} className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition"><FileText className="w-4 h-4"/></button>
-                         </td>
-                       </tr>
-                     ))}
-                   </tbody>
-                 </table>
+            <div className="lg:col-span-2">
+               {/* NEW FILTER TABS */}
+               <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+                  {filters.map(f => (
+                      <button key={f.id} onClick={() => setFilterType(f.id)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition whitespace-nowrap ${filterType === f.id ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-purple-50'}`}>
+                          <f.icon className="w-4 h-4"/> {f.label}
+                      </button>
+                  ))}
+               </div>
+
+               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                 <div className="p-4 border-b border-gray-100 bg-gray-50 font-bold text-gray-700">Recent Campaigns</div>
+                 <div className="overflow-x-auto">
+                   <table className="w-full text-sm text-left">
+                     <thead className="text-gray-500 border-b"><tr><th className="p-4">Campaign Details</th><th className="p-4">Target</th><th className="p-4 text-right">Actions</th></tr></thead>
+                     <tbody className="divide-y divide-gray-100">
+                       {getFilteredCampaigns().map((c, i) => (
+                         <tr key={i} className="hover:bg-gray-50 transition">
+                           <td className="p-4">
+                             <div className="font-bold text-gray-900">{c.campaignName}</div>
+                             <div className="flex items-center gap-2 mt-1">
+                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${c.type==='SMS'?'bg-blue-100 text-blue-700':c.type==='EMAIL'?'bg-yellow-100 text-yellow-700':'bg-green-100 text-green-700'}`}>
+                                    {c.type==='SMS'?'PROMO':c.type==='EMAIL'?'NEWS':'ORDER'}
+                                </span>
+                                <span className="text-xs text-gray-400">{new Date(c.createdAt).toLocaleDateString()}</span>
+                             </div>
+                           </td>
+                           <td className="p-4 text-gray-600 flex items-center gap-1"><MapPin className="w-3 h-3"/> {c.targetCity || "Global"}</td>
+                           <td className="p-4 text-right space-x-2">
+                             <button onClick={() => startEditCampaign(c)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 className="w-4 h-4"/></button>
+                             <button onClick={() => handleViewReport(c)} className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition"><FileText className="w-4 h-4"/></button>
+                           </td>
+                         </tr>
+                       ))}
+                     </tbody>
+                   </table>
+                 </div>
                </div>
             </div>
           </div>
         )}
 
+        {/* ... (Users Tab code remains exactly the same as before) ... */}
         {activeTab === 'USERS' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">

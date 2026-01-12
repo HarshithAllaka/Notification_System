@@ -5,7 +5,8 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { 
   Users, Briefcase, Megaphone, LogOut, UploadCloud, 
-  Plus, Trash2, Edit2, Shield, Search, Power 
+  Plus, Trash2, Edit2, Shield, Search, Power,
+  Filter, Tag, Mail, ShoppingBag
 } from 'lucide-react';
 
 const Dashboard = () => {
@@ -21,6 +22,7 @@ const Dashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingUser, setEditingUser] = useState(null);
   const [file, setFile] = useState(null);
+  const [filterType, setFilterType] = useState('ALL'); // <--- NEW FILTER
   
   // Forms
   const [userData, setUserData] = useState({ name: '', email: '', password: '', city: '', phone: '' });
@@ -47,7 +49,6 @@ const Dashboard = () => {
 
   const handleLogout = () => { localStorage.clear(); navigate('/login'); };
 
-  // --- ACTIONS ---
   const handleUserSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -63,15 +64,8 @@ const Dashboard = () => {
     try { await api.delete(`${endpoint}/${id}`); toast.success("Deleted!"); fetchAllData(); } catch(err){ toast.error("Failed."); }
   };
 
-  // --- NEW: Toggle Status Logic ---
   const handleToggleStatus = async (userId) => {
-    try {
-        await api.put(`/admin/users/${userId}/toggle-status`);
-        toast.success("Status Updated");
-        fetchAllData(); // Refresh list to show new color
-    } catch (err) {
-        toast.error("Update failed");
-    }
+    try { await api.put(`/admin/users/${userId}/toggle-status`); toast.success("Status Updated"); fetchAllData(); } catch (err) { toast.error("Update failed"); }
   };
 
   const handleUpload = async () => {
@@ -85,7 +79,6 @@ const Dashboard = () => {
     try { await api.post('/admin/create-staff', staffData); toast.success("Staff Added!"); fetchAllData(); } catch(err){ toast.error("Failed."); }
   };
 
-  // --- REPORTING ---
   const handleViewReport = async (camp) => {
     setSelectedCampaign(camp);
     try { const { data } = await api.get(`/campaigns/${camp.id}/recipients`); setRecipients(data); } catch(err){}
@@ -99,47 +92,32 @@ const Dashboard = () => {
     const a = document.createElement('a'); a.href=url; a.download=`Report.csv`; a.click();
   };
 
+  // --- FILTER HELPER ---
+  const getFilteredCampaigns = () => {
+    if (filterType === 'ALL') return campaigns;
+    return campaigns.filter(c => c.type === filterType);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex font-sans text-gray-800">
       <ToastContainer position="top-right" autoClose={2000} theme="colored" />
       
-      {/* --- SIDEBAR --- */}
+      {/* SIDEBAR */}
       <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col">
         <div className="p-6 border-b border-gray-100">
-          <h2 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600">
-            Nykaa Admin
-          </h2>
+          <h2 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600">Nykaa Admin</h2>
         </div>
-        
         <nav className="flex-1 p-4 space-y-2">
-          {[
-            { id: 'USERS', icon: Users, label: 'Customer Base' },
-            { id: 'STAFF', icon: Briefcase, label: 'Staff Management' },
-            { id: 'CAMPAIGNS', icon: Megaphone, label: 'Campaigns' },
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${
-                activeTab === item.id 
-                ? 'bg-pink-50 text-pink-700 shadow-sm' 
-                : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <item.icon className="w-5 h-5" />
-              {item.label}
+          {[{ id: 'USERS', icon: Users, label: 'Customer Base' }, { id: 'STAFF', icon: Briefcase, label: 'Staff Management' }, { id: 'CAMPAIGNS', icon: Megaphone, label: 'Campaigns' }].map((item) => (
+            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${activeTab === item.id ? 'bg-pink-50 text-pink-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
+              <item.icon className="w-5 h-5" />{item.label}
             </button>
           ))}
         </nav>
-
-        <div className="p-4 border-t border-gray-100">
-          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl transition font-medium">
-            <LogOut className="w-5 h-5" /> Logout
-          </button>
-        </div>
+        <div className="p-4 border-t border-gray-100"><button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl transition font-medium"><LogOut className="w-5 h-5" /> Logout</button></div>
       </aside>
 
-      {/* --- MAIN CONTENT --- */}
+      {/* MAIN CONTENT */}
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="flex justify-between items-center mb-8">
           <div>
@@ -150,82 +128,43 @@ const Dashboard = () => {
             </h1>
             <p className="text-gray-500 text-sm mt-1">Manage and organize your system data.</p>
           </div>
-          <button 
-            onClick={() => navigate('/creator-dashboard')}
-            className="flex items-center gap-2 bg-gradient-to-r from-pink-600 to-purple-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg hover:shadow-xl hover:scale-105 transition"
-          >
-            <Plus className="w-5 h-5" /> Launch Campaign
-          </button>
+          <button onClick={() => navigate('/creator-dashboard')} className="flex items-center gap-2 bg-gradient-to-r from-pink-600 to-purple-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg hover:shadow-xl hover:scale-105 transition"><Plus className="w-5 h-5" /> Launch Campaign</button>
         </header>
 
-        {/* === TAB 1: USERS === */}
         {activeTab === 'USERS' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Form Card */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
-              <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Plus className="w-5 h-5 text-pink-500" /> {editingUser ? 'Edit User' : 'Add New User'}
-              </h3>
+              <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><Plus className="w-5 h-5 text-pink-500" /> {editingUser ? 'Edit User' : 'Add New User'}</h3>
               <form onSubmit={handleUserSubmit} className="space-y-4">
-                <input type="text" placeholder="Full Name" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-pink-500 outline-none transition" value={userData.name} onChange={e => setUserData({...userData, name: e.target.value})} required />
-                <input type="email" placeholder="Email Address" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-pink-500 outline-none transition" value={userData.email} onChange={e => setUserData({...userData, email: e.target.value})} required />
-                <input type="password" placeholder="Password" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-pink-500 outline-none transition" value={userData.password} onChange={e => setUserData({...userData, password: e.target.value})} />
+                <input type="text" placeholder="Full Name" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" value={userData.name} onChange={e => setUserData({...userData, name: e.target.value})} required />
+                <input type="email" placeholder="Email Address" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" value={userData.email} onChange={e => setUserData({...userData, email: e.target.value})} required />
+                <input type="password" placeholder="Password" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" value={userData.password} onChange={e => setUserData({...userData, password: e.target.value})} />
                 <div className="grid grid-cols-2 gap-2">
                     <input type="text" placeholder="Phone" className="bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" value={userData.phone} onChange={e => setUserData({...userData, phone: e.target.value})} />
                     <input type="text" placeholder="City" className="bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" value={userData.city} onChange={e => setUserData({...userData, city: e.target.value})} />
                 </div>
-                <button className="w-full bg-gray-900 text-white py-3 rounded-xl font-bold hover:bg-black transition">
-                  {editingUser ? 'Save Changes' : 'Create User'}
-                </button>
+                <button className="w-full bg-gray-900 text-white py-3 rounded-xl font-bold hover:bg-black transition">{editingUser ? 'Save Changes' : 'Create User'}</button>
               </form>
-              
               <div className="mt-6 pt-6 border-t border-gray-100">
                 <h4 className="text-sm font-bold text-gray-600 mb-3 flex items-center gap-2"><UploadCloud className="w-4 h-4"/> Bulk Import</h4>
-                <div className="flex gap-2">
-                  <input type="file" className="text-xs w-full text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100" onChange={e => setFile(e.target.files[0])} />
-                  <button onClick={handleUpload} className="bg-green-600 text-white px-3 py-1 rounded-lg text-xs font-bold hover:bg-green-700">Upload</button>
-                </div>
+                <div className="flex gap-2"><input type="file" className="text-xs w-full text-gray-500" onChange={e => setFile(e.target.files[0])} /><button onClick={handleUpload} className="bg-green-600 text-white px-3 py-1 rounded-lg text-xs font-bold hover:bg-green-700">Upload</button></div>
               </div>
             </div>
-
-            {/* Table Card */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 lg:col-span-2 overflow-hidden">
                <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
                   <span className="font-bold text-gray-600">Total Users: {users.length}</span>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-2 w-4 h-4 text-gray-400" />
-                    <input type="text" placeholder="Search..." className="pl-9 pr-4 py-1.5 rounded-full border border-gray-200 text-sm focus:outline-none focus:border-pink-500" onChange={(e) => setSearchTerm(e.target.value)} />
-                  </div>
+                  <div className="relative"><Search className="absolute left-3 top-2 w-4 h-4 text-gray-400" /><input type="text" placeholder="Search..." className="pl-9 pr-4 py-1.5 rounded-full border border-gray-200 text-sm focus:outline-none focus:border-pink-500" onChange={(e) => setSearchTerm(e.target.value)} /></div>
                </div>
                <div className="overflow-x-auto">
                  <table className="w-full text-sm text-left">
-                   <thead className="bg-white text-gray-500 border-b">
-                     <tr><th className="p-4 font-semibold">User</th><th className="p-4 font-semibold">Status</th><th className="p-4 font-semibold text-right">Actions</th></tr>
-                   </thead>
+                   <thead className="bg-white text-gray-500 border-b"><tr><th className="p-4 font-semibold">User</th><th className="p-4 font-semibold">Status</th><th className="p-4 font-semibold text-right">Actions</th></tr></thead>
                    <tbody className="divide-y divide-gray-100">
                      {users.filter(u => u.name.toLowerCase().includes(searchTerm.toLowerCase())).map(u => (
                        <tr key={u.userId} className={`hover:bg-gray-50 transition ${!u.active ? 'opacity-60 bg-gray-50' : ''}`}>
-                         <td className="p-4">
-                           <div className="font-bold text-gray-900">{u.name}</div>
-                           <div className="text-xs text-gray-500">{u.email}</div>
-                         </td>
-                         <td className="p-4">
-                            {/* --- STATUS BADGE --- */}
-                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${u.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                {u.active ? 'Active' : 'Inactive'}
-                            </span>
-                         </td>
+                         <td className="p-4"><div className="font-bold text-gray-900">{u.name}</div><div className="text-xs text-gray-500">{u.email}</div></td>
+                         <td className="p-4"><span className={`px-2 py-1 rounded-full text-xs font-bold ${u.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{u.active ? 'Active' : 'Inactive'}</span></td>
                          <td className="p-4 flex justify-end gap-2">
-                           
-                           {/* --- TOGGLE BUTTON --- */}
-                           <button 
-                             onClick={() => handleToggleStatus(u.userId)} 
-                             title={u.active ? "Deactivate User" : "Activate User"}
-                             className={`p-2 rounded-lg transition ${u.active ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-200'}`}
-                           >
-                                <Power className="w-4 h-4"/>
-                           </button>
-
+                           <button onClick={() => handleToggleStatus(u.userId)} className={`p-2 rounded-lg transition ${u.active ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-200'}`}><Power className="w-4 h-4"/></button>
                            <button onClick={() => {setEditingUser(u.userId); setUserData(u);}} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Edit2 className="w-4 h-4"/></button>
                            <button onClick={() => handleDelete('/admin/users', u.userId)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
                          </td>
@@ -238,13 +177,10 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* === TAB 2: STAFF === */}
         {activeTab === 'STAFF' && (
            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
-                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                   <Shield className="w-5 h-5 text-purple-600" /> Hire Staff
-                </h3>
+                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><Shield className="w-5 h-5 text-purple-600" /> Hire Staff</h3>
                 <form onSubmit={handleCreateStaff} className="space-y-4">
                    <input type="text" placeholder="Name" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" value={staffData.name} onChange={e => setStaffData({...staffData, name: e.target.value})} required />
                    <input type="email" placeholder="Email" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" value={staffData.email} onChange={e => setStaffData({...staffData, email: e.target.value})} required />
@@ -273,27 +209,39 @@ const Dashboard = () => {
            </div>
         )}
 
-        {/* === TAB 3: CAMPAIGNS === */}
         {activeTab === 'CAMPAIGNS' && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-             <table className="w-full text-sm text-left">
-               <thead className="bg-gray-50 text-gray-500"><tr><th className="p-4">Campaign</th><th className="p-4">Date</th><th className="p-4 text-right">Actions</th></tr></thead>
-               <tbody className="divide-y divide-gray-100">
-                 {campaigns.map(c => (
-                   <tr key={c.id} className="hover:bg-gray-50">
-                     <td className="p-4">
-                       <div className="font-bold text-gray-900">{c.campaignName}</div>
-                       <span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600">{c.type}</span>
-                     </td>
-                     <td className="p-4 text-gray-500">{new Date(c.createdAt).toLocaleDateString()}</td>
-                     <td className="p-4 flex justify-end gap-3">
-                       <button onClick={() => handleViewReport(c)} className="text-purple-600 hover:underline text-xs font-bold">View Report</button>
-                       <button onClick={() => handleDelete('/campaigns', c.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg"><Trash2 className="w-4 h-4"/></button>
-                     </td>
-                   </tr>
-                 ))}
-               </tbody>
-             </table>
+          <div>
+            {/* NEW FILTER TABS */}
+            <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+                {[{id:'ALL',label:'All',icon:Filter},{id:'SMS',label:'Promotions',icon:Tag},{id:'EMAIL',label:'Newsletters',icon:Mail},{id:'PUSH',label:'Orders',icon:ShoppingBag}].map(f => (
+                    <button key={f.id} onClick={() => setFilterType(f.id)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition whitespace-nowrap ${filterType === f.id ? 'bg-pink-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-pink-50'}`}>
+                        <f.icon className="w-4 h-4"/> {f.label}
+                    </button>
+                ))}
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <table className="w-full text-sm text-left">
+                <thead className="bg-gray-50 text-gray-500"><tr><th className="p-4">Campaign</th><th className="p-4">Date</th><th className="p-4 text-right">Actions</th></tr></thead>
+                <tbody className="divide-y divide-gray-100">
+                    {getFilteredCampaigns().map(c => (
+                    <tr key={c.id} className="hover:bg-gray-50">
+                        <td className="p-4">
+                        <div className="font-bold text-gray-900">{c.campaignName}</div>
+                        <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${c.type==='SMS'?'bg-blue-100 text-blue-700':c.type==='EMAIL'?'bg-yellow-100 text-yellow-700':'bg-green-100 text-green-700'}`}>
+                             {c.type==='SMS'?'PROMO':c.type==='EMAIL'?'NEWS':'ORDER'}
+                        </span>
+                        </td>
+                        <td className="p-4 text-gray-500">{new Date(c.createdAt).toLocaleDateString()}</td>
+                        <td className="p-4 flex justify-end gap-3">
+                        <button onClick={() => handleViewReport(c)} className="text-purple-600 hover:underline text-xs font-bold">View Report</button>
+                        <button onClick={() => handleDelete('/campaigns', c.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg"><Trash2 className="w-4 h-4"/></button>
+                        </td>
+                    </tr>
+                    ))}
+                </tbody>
+                </table>
+            </div>
           </div>
         )}
       </main>
@@ -307,12 +255,10 @@ const Dashboard = () => {
                 <button onClick={() => setSelectedCampaign(null)} className="text-gray-400 hover:text-white">✕</button>
              </div>
              <div className="p-6 max-h-80 overflow-y-auto">
-                {recipients.length === 0 ? <p className="text-center text-gray-500">No data found.</p> : (
-                  <table className="w-full text-sm text-left">
-                     <thead className="bg-gray-50"><tr><th className="p-2">Name</th><th className="p-2">Email</th><th className="p-2">Status</th></tr></thead>
-                     <tbody>{recipients.map((r,i)=><tr key={i} className="border-b"><td className="p-2">{r.name}</td><td className="p-2">{r.email}</td><td className="p-2 text-green-600 font-bold">{r.status}</td></tr>)}</tbody>
-                  </table>
-                )}
+                <table className="w-full text-sm text-left">
+                   <thead className="bg-gray-50"><tr><th className="p-2">Name</th><th className="p-2">Email</th><th className="p-2">Status</th></tr></thead>
+                   <tbody>{recipients.map((r,i)=><tr key={i} className="border-b"><td className="p-2">{r.name}</td><td className="p-2">{r.email}</td><td className="p-2 text-green-600 font-bold">{r.status}</td></tr>)}</tbody>
+                </table>
              </div>
              <div className="p-4 border-t flex justify-end bg-gray-50">
                 <button onClick={downloadCSV} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-green-700 shadow-lg">Download CSV</button>
