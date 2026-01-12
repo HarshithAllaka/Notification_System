@@ -57,22 +57,28 @@ public class UserController {
         return ResponseEntity.ok(preferenceRepository.save(existing));
     }
 
-    // 3. Get My Notifications (Messages)
+    // 3. Get My Notifications
     @GetMapping("/notifications")
     public ResponseEntity<List<NotificationDto>> getMyNotifications() {
         String email = getCurrentUserEmail();
         String userId = userRepository.findByEmail(email).get().getUserId();
 
-        // Find logs specifically for this user
         List<NotificationLog> logs = logRepository.findAll().stream()
                 .filter(log -> log.getUserId().equals(userId))
                 .collect(Collectors.toList());
 
-        // Convert logs to DTOs (Get the Campaign Name for each log)
         List<NotificationDto> notifications = logs.stream().map(log -> {
             Campaign c = campaignRepository.findById(log.getCampaignId()).orElse(null);
             NotificationDto dto = new NotificationDto();
-            dto.setMessage(c != null ? c.getCampaignName() : "Unknown Message");
+            if (c != null) {
+                dto.setMessage(c.getCampaignName());
+                dto.setContent(c.getContent());
+                dto.setType(c.getType()); // <--- SET THE TYPE HERE
+            } else {
+                dto.setMessage("System Message");
+                dto.setContent("Notification details unavailable");
+                dto.setType("PUSH");
+            }
             dto.setReceivedAt(log.getSentAt());
             return dto;
         }).collect(Collectors.toList());
