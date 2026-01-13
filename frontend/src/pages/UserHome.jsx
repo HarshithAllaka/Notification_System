@@ -1,16 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
-import { LogOut, Bell, Settings, CheckCircle2, MapPin, ShoppingBag, Tag, Mail, User } from 'lucide-react';
+import { LogOut, Bell, Settings, CheckCircle2, MapPin, ShoppingBag, Tag, Mail, User, MessageSquare } from 'lucide-react';
 
 const UserHome = () => {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
-  const [pref, setPref] = useState({ offers: true, newsletter: true, orderUpdates: true });
+  const [pref, setPref] = useState({ 
+    offers: true, newsletter: true, orderUpdates: true,
+    emailOffers: true, smsOffers: true, pushOffers: true,
+    emailNewsletters: true, smsNewsletters: true, pushNewsletters: true,
+    emailOrders: true, smsOrders: true, pushOrders: true
+  });
   const [user, setUser] = useState({});
   
-  // New State for Inbox Tabs
+  // New State for Category and Channel Filters
   const [activeCategory, setActiveCategory] = useState('ALL');
+  const [activeChannel, setActiveChannel] = useState('ALL');
 
   useEffect(() => {
     const loadData = async () => {
@@ -25,13 +31,15 @@ const UserHome = () => {
            api.get('/users/notifications'),
            api.get('/users/preferences')
         ]);
-        const sortedNotifications = notifRes.data.sort((a, b) => new Date(b.receivedAt) - new Date(a.receivedAt));
+        const sortedNotifications = (notifRes.data || []).sort((a, b) => new Date(b.receivedAt) - new Date(a.receivedAt));
         setNotifications(sortedNotifications);
-        setPref(prefRes.data);
+        setPref(prefRes.data || {});
       } catch (err) {
         if(err.response && (err.response.status === 403 || err.response.status === 401)) {
             localStorage.clear(); navigate('/login');
         }
+        setNotifications([]);
+        setPref({});
       }
     };
     loadData();
@@ -47,15 +55,21 @@ const UserHome = () => {
 
   // --- FILTERING LOGIC ---
   const getFilteredNotifications = () => {
-    if (activeCategory === 'ALL') return notifications;
-    return notifications.filter(n => n.type === activeCategory);
+    let filtered = notifications;
+    if (activeCategory !== 'ALL') {
+      filtered = filtered.filter(n => n.campaignType === activeCategory);
+    }
+    if (activeChannel !== 'ALL') {
+      filtered = filtered.filter(n => n.channels && n.channels.includes(activeChannel));
+    }
+    return filtered;
   };
 
   const categories = [
     { id: 'ALL', label: 'All', icon: Bell },
-    { id: 'SMS', label: 'Promotions', icon: Tag },       // SMS = Promotional
-    { id: 'EMAIL', label: 'Newsletters', icon: Mail },   // EMAIL = Newsletters
-    { id: 'PUSH', label: 'Orders', icon: ShoppingBag },  // PUSH = Order Updates
+    { id: 'Promotion Offers', label: 'Promotions', icon: Tag },
+    { id: 'Newsletters', label: 'Newsletters', icon: Mail },
+    { id: 'Order Updates', label: 'Orders', icon: ShoppingBag },
   ];
 
   return (
@@ -82,20 +96,59 @@ const UserHome = () => {
                         <p className="text-xs text-gray-400 flex items-center gap-1 mt-1"><MapPin className="w-3 h-3"/> {user.city || 'N/A'}</p>
                     </div>
                 </div>
-                <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2"><Settings className="w-4 h-4"/> Settings</h3>
-                <div className="space-y-3">
-                {[
-                    { key: 'offers', label: 'Promotions' },
-                    { key: 'newsletter', label: 'Newsletters' },
-                    { key: 'orderUpdates', label: 'Orders' }
-                ].map((item) => (
-                    <label key={item.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition">
-                        <span className="text-sm font-medium text-gray-700">{item.label}</span>
-                        <div className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors ${pref[item.key] ? 'bg-green-500' : 'bg-gray-300'}`} onClick={() => updatePref(item.key)}>
-                            <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${pref[item.key] ? 'translate-x-4' : ''}`}></div>
-                        </div>
-                    </label>
-                ))}
+                <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2"><Settings className="w-4 h-4"/> Notification Preferences</h3>
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-600 mb-2">Promotion Offers</h4>
+                    <div className="space-y-2">
+                      <label className="flex items-center justify-between p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition">
+                        <span className="text-sm">Email</span>
+                        <input type="checkbox" checked={pref.emailOffers} onChange={() => updatePref('emailOffers')} className="w-4 h-4 text-pink-600 rounded" />
+                      </label>
+                      <label className="flex items-center justify-between p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition">
+                        <span className="text-sm">SMS</span>
+                        <input type="checkbox" checked={pref.smsOffers} onChange={() => updatePref('smsOffers')} className="w-4 h-4 text-pink-600 rounded" />
+                      </label>
+                      <label className="flex items-center justify-between p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition">
+                        <span className="text-sm">Push</span>
+                        <input type="checkbox" checked={pref.pushOffers} onChange={() => updatePref('pushOffers')} className="w-4 h-4 text-pink-600 rounded" />
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-600 mb-2">Newsletters</h4>
+                    <div className="space-y-2">
+                      <label className="flex items-center justify-between p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition">
+                        <span className="text-sm">Email</span>
+                        <input type="checkbox" checked={pref.emailNewsletters} onChange={() => updatePref('emailNewsletters')} className="w-4 h-4 text-pink-600 rounded" />
+                      </label>
+                      <label className="flex items-center justify-between p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition">
+                        <span className="text-sm">SMS</span>
+                        <input type="checkbox" checked={pref.smsNewsletters} onChange={() => updatePref('smsNewsletters')} className="w-4 h-4 text-pink-600 rounded" />
+                      </label>
+                      <label className="flex items-center justify-between p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition">
+                        <span className="text-sm">Push</span>
+                        <input type="checkbox" checked={pref.pushNewsletters} onChange={() => updatePref('pushNewsletters')} className="w-4 h-4 text-pink-600 rounded" />
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-600 mb-2">Order Updates</h4>
+                    <div className="space-y-2">
+                      <label className="flex items-center justify-between p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition">
+                        <span className="text-sm">Email</span>
+                        <input type="checkbox" checked={pref.emailOrders} onChange={() => updatePref('emailOrders')} className="w-4 h-4 text-pink-600 rounded" />
+                      </label>
+                      <label className="flex items-center justify-between p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition">
+                        <span className="text-sm">SMS</span>
+                        <input type="checkbox" checked={pref.smsOrders} onChange={() => updatePref('smsOrders')} className="w-4 h-4 text-pink-600 rounded" />
+                      </label>
+                      <label className="flex items-center justify-between p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition">
+                        <span className="text-sm">Push</span>
+                        <input type="checkbox" checked={pref.pushOrders} onChange={() => updatePref('pushOrders')} className="w-4 h-4 text-pink-600 rounded" />
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
           </div>
@@ -122,32 +175,54 @@ const UserHome = () => {
                     </button>
                 ))}
              </div>
+
+             {/* CHANNEL FILTERS */}
+             <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                {[
+                  { id: 'ALL', label: 'All Channels' },
+                  { id: 'EMAIL', label: 'Email' },
+                  { id: 'SMS', label: 'SMS' },
+                  { id: 'PUSH', label: 'Push' }
+                ].map(channel => (
+                    <button 
+                        key={channel.id}
+                        onClick={() => setActiveChannel(channel.id)}
+                        className={`px-3 py-1 rounded-full text-xs font-bold transition whitespace-nowrap ${
+                            activeChannel === channel.id 
+                            ? 'bg-blue-600 text-white' 
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                    >
+                        {channel.label}
+                    </button>
+                ))}
+             </div>
              
              {/* LIST */}
              <div className="space-y-4">
                 {getFilteredNotifications().length === 0 ? (
                     <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-300">
                         <Bell className="w-12 h-12 text-gray-200 mx-auto mb-3"/>
-                        <p className="text-gray-400">No {activeCategory === 'ALL' ? '' : activeCategory.toLowerCase()} messages yet.</p>
+                        <p className="text-gray-400">No messages found for the selected filters.</p>
                     </div>
                 ) : (
                     getFilteredNotifications().map((n, i) => (
                     <div key={i} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition flex gap-4 animate-in fade-in slide-in-from-bottom-2">
                         <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-                            n.type === 'SMS' ? 'bg-blue-50 text-blue-600' : 
-                            n.type === 'EMAIL' ? 'bg-yellow-50 text-yellow-600' : 'bg-green-50 text-green-600'
+                            n.channels && n.channels.includes('SMS') ? 'bg-blue-50 text-blue-600' : 
+                            n.channels && n.channels.includes('EMAIL') ? 'bg-yellow-50 text-yellow-600' : 'bg-green-50 text-green-600'
                         }`}>
-                            {n.type === 'SMS' && <Tag className="w-6 h-6"/>}
-                            {n.type === 'EMAIL' && <Mail className="w-6 h-6"/>}
-                            {n.type === 'PUSH' && <ShoppingBag className="w-6 h-6"/>}
+                            {n.channels && n.channels.includes('SMS') && <Tag className="w-6 h-6"/>}
+                            {n.channels && n.channels.includes('EMAIL') && <Mail className="w-6 h-6"/>}
+                            {n.channels && n.channels.includes('PUSH') && <ShoppingBag className="w-6 h-6"/>}
                         </div>
                         <div>
                             <div className="flex items-center gap-2 mb-1">
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                                    n.type === 'SMS' ? 'bg-blue-100 text-blue-700' : 
-                                    n.type === 'EMAIL' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
+                                    n.campaignType === 'Promotion Offers' ? 'bg-blue-100 text-blue-700' : 
+                                    n.campaignType === 'Newsletters' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
                                 }`}>
-                                    {n.type === 'SMS' ? 'PROMO' : n.type === 'EMAIL' ? 'NEWS' : 'ORDER'}
+                                    {n.campaignType === 'Promotion Offers' ? 'PROMO' : n.campaignType === 'Newsletters' ? 'NEWS' : 'ORDER'}
                                 </span>
                                 <span className="text-xs text-gray-400">{new Date(n.receivedAt).toLocaleString()}</span>
                             </div>

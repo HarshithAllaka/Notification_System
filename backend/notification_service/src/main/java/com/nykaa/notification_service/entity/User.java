@@ -13,7 +13,10 @@ import lombok.*;
 public class User {
     
     @Id
-    @Column(name = "user_id")
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "user_id", unique = true)
     @CsvBindByName(column = "user_id")
     private String userId;
 

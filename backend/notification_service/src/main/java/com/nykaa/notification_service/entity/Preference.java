@@ -13,9 +13,25 @@ public class Preference {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private boolean offers;
+    // Legacy fields for backward compatibility (map to granular)
     private boolean newsletter;
+    private boolean offers;
     private boolean orderUpdates;
+
+    // Promotion Offers preferences
+    private boolean emailOffers;
+    private boolean smsOffers;
+    private boolean pushOffers;
+
+    // Newsletters preferences
+    private boolean emailNewsletters;
+    private boolean smsNewsletters;
+    private boolean pushNewsletters;
+
+    // Order Updates preferences
+    private boolean emailOrders;
+    private boolean smsOrders;
+    private boolean pushOrders;
 
     @OneToOne
     @JoinColumn(name = "user_id")

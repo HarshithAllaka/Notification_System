@@ -17,7 +17,7 @@ const CreatorDashboard = () => {
   // Campaign State
   const [campaigns, setCampaigns] = useState([]);
   const [campaignData, setCampaignData] = useState({ 
-    name: '', type: 'SMS', content: '', schedule: '', targetCities: [] 
+    name: '', type: 'Promotion Offers', content: '', schedule: '', targetCities: [], channels: ['EMAIL', 'SMS', 'PUSH']
   });
   
   // User State
@@ -50,10 +50,14 @@ const CreatorDashboard = () => {
         api.get('/campaigns/history'),
         api.get('/admin/users/all')
       ]);
-      const sortedCampaigns = campRes.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const sortedCampaigns = (campRes.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setCampaigns(sortedCampaigns);
-      setUsers(userRes.data);
-    } catch (err) { console.error("Failed to load data"); }
+      setUsers(userRes.data || []);
+    } catch (err) { 
+      console.error("Failed to load data", err); 
+      setCampaigns([]);
+      setUsers([]);
+    }
   };
 
   const handleLogout = () => { localStorage.clear(); navigate('/login'); };
@@ -69,7 +73,7 @@ const CreatorDashboard = () => {
         await api.post('/campaigns/create', campaignData);
         toast.success("Campaign Created!");
       }
-      setCampaignData({ name: '', type: 'SMS', content: '', schedule: '', targetCities: [] });
+      setCampaignData({ name: '', type: 'Promotion Offers', content: '', schedule: '', targetCities: [], channels: ['EMAIL', 'SMS', 'PUSH'] });
       setEditingCampaign(null);
       fetchData();
     } catch (err) { toast.error("Operation failed."); }
@@ -153,9 +157,9 @@ const CreatorDashboard = () => {
 
   const filters = [
       { id: 'ALL', label: 'All', icon: Filter },
-      { id: 'SMS', label: 'Promotions', icon: Tag },
-      { id: 'EMAIL', label: 'Newsletters', icon: Mail },
-      { id: 'PUSH', label: 'Orders', icon: ShoppingBag },
+      { id: 'Promotion Offers', label: 'Promotions', icon: Tag },
+      { id: 'Newsletters', label: 'Newsletters', icon: Mail },
+      { id: 'Order Updates', label: 'Orders', icon: ShoppingBag },
   ];
 
   return (
@@ -230,12 +234,33 @@ const CreatorDashboard = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Channel</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Campaign Type</label>
                     <select className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" value={campaignData.type} onChange={(e) => setCampaignData({...campaignData, type: e.target.value})}>
-                      <option value="SMS">Promotional Offer</option>
-                      <option value="EMAIL">Newsletter</option>
-                      <option value="PUSH">Order Update</option>
+                      <option value="Promotion Offers">Promotional Offer</option>
+                      <option value="Newsletters">Newsletter</option>
+                      <option value="Order Updates">Order Update</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Channels</label>
+                    <div className="flex gap-2 mt-2">
+                      {['EMAIL', 'SMS', 'PUSH'].map(channel => (
+                        <label key={channel} className="flex items-center gap-1">
+                          <input
+                            type="checkbox"
+                            checked={campaignData.channels.includes(channel)}
+                            onChange={(e) => {
+                              const newChannels = e.target.checked
+                                ? [...campaignData.channels, channel]
+                                : campaignData.channels.filter(c => c !== channel);
+                              setCampaignData({...campaignData, channels: newChannels});
+                            }}
+                            className="w-4 h-4 text-purple-600 rounded"
+                          />
+                          <span className="text-xs">{channel}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 </div>
                 <div>

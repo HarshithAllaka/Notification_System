@@ -2,9 +2,8 @@ package com.nykaa.notification_service.controller;
 
 import com.nykaa.notification_service.dto.LoginRequest;
 import com.nykaa.notification_service.dto.RegisterRequest;
-import com.nykaa.notification_service.entity.Staff;
 import com.nykaa.notification_service.entity.User;
-import com.nykaa.notification_service.repository.StaffRepository;
+import com.nykaa.notification_service.repository.UserRepository;
 import com.nykaa.notification_service.service.UserService;
 import com.nykaa.notification_service.config.JwtService;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +29,7 @@ public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final UserService userService;
-    private final StaffRepository staffRepository;
+    private final UserRepository userRepository;
     private final JwtService jwtService;
 
     @PostMapping("/login")
@@ -43,7 +42,8 @@ public class AuthController {
             logger.info("Authentication successful for email: {}", request.getEmail());
 
             // 1. Check if Staff (Admin/Creator/Viewer)
-            Optional<Staff> staff = staffRepository.findByEmail(request.getEmail());
+            Optional<User> staff = userRepository.findByEmail(request.getEmail())
+                .filter(u -> u.getRole() != com.nykaa.notification_service.entity.Role.USER);
             if (staff.isPresent()) {
                 String token = jwtService.generateToken(staff.get().getEmail(), staff.get().getRole().name());
                 logger.info("Staff login successful: {} with role {}", staff.get().getEmail(), staff.get().getRole());

@@ -54,9 +54,18 @@ public class UserService {
     private void createDefaultPreferences(User user) {
         Preference pref = new Preference();
         pref.setUser(user);
-        pref.setOffers(true);
-        pref.setNewsletter(true);
-        pref.setOrderUpdates(true);
+        // Promotion Offers
+        pref.setEmailOffers(true);
+        pref.setSmsOffers(true);
+        pref.setPushOffers(true);
+        // Newsletters
+        pref.setEmailNewsletters(true);
+        pref.setSmsNewsletters(true);
+        pref.setPushNewsletters(true);
+        // Order Updates
+        pref.setEmailOrders(true);
+        pref.setSmsOrders(true);
+        pref.setPushOrders(true);
         preferenceRepository.save(pref);
     }
 
@@ -90,7 +99,7 @@ public class UserService {
     }
 
     public User updateUser(String userId, User updatedData) {
-        User existing = userRepository.findById(userId)
+        User existing = userRepository.findByUserId(userId)
             .orElseThrow(() -> new RuntimeException("User not found"));
         
         existing.setName(updatedData.getName());
@@ -105,12 +114,14 @@ public class UserService {
     }
 
     public void deleteUser(String userId) {
-        userRepository.deleteById(userId);
+        User user = userRepository.findByUserId(userId)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        userRepository.delete(user);
     }
 
     // --- NEW: Toggle Active Status ---
     public String toggleUserActiveStatus(String userId) {
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         
         user.setActive(!user.isActive()); // Flip status

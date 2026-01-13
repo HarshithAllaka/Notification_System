@@ -1,9 +1,9 @@
 package com.nykaa.notification_service.controller;
 
-import com.nykaa.notification_service.entity.Staff;
 import com.nykaa.notification_service.entity.User;
-import com.nykaa.notification_service.repository.StaffRepository;
+import com.nykaa.notification_service.entity.Preference;
 import com.nykaa.notification_service.repository.UserRepository;
+import com.nykaa.notification_service.repository.PreferenceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -19,7 +19,7 @@ import java.util.Optional;
 public class ProfileController {
 
     private final UserRepository userRepository;
-    private final StaffRepository staffRepository;
+    private final PreferenceRepository preferenceRepository;
     private final PasswordEncoder passwordEncoder;
 
     // Helper to get current logged-in user's email from the security token
@@ -33,13 +33,7 @@ public class ProfileController {
     public ResponseEntity<?> getMyProfile() {
         String email = getCurrentUserEmail();
 
-        // Check if Staff
-        Optional<Staff> staff = staffRepository.findByEmail(email);
-        if (staff.isPresent()) {
-            return ResponseEntity.ok(staff.get());
-        }
-
-        // Check if User
+        // Check if User (includes staff)
         Optional<User> user = userRepository.findByEmail(email);
         if (user.isPresent()) {
             return ResponseEntity.ok(user.get());
@@ -53,31 +47,14 @@ public class ProfileController {
     public ResponseEntity<?> updateMyProfile(@RequestBody ProfileUpdateRequest request) {
         String email = getCurrentUserEmail();
 
-        // Check if Staff
-        Optional<Staff> staffOpt = staffRepository.findByEmail(email);
-        if (staffOpt.isPresent()) {
-            Staff staff = staffOpt.get();
-            if (request.getName() != null) staff.setName(request.getName());
-            if (request.getPassword() != null && !request.getPassword().isEmpty()) {
-                if (request.getOldPassword() == null || request.getOldPassword().isEmpty()) {
-                    return ResponseEntity.badRequest().body("Old password is required to change password");
-                }
-                if (!passwordEncoder.matches(request.getOldPassword(), staff.getPassword())) {
-                    return ResponseEntity.badRequest().body("Old password is incorrect");
-                }
-                staff.setPassword(passwordEncoder.encode(request.getPassword()));
-            }
-            staffRepository.save(staff);
-            return ResponseEntity.ok(staff);
-        }
-
-        // Check if User
         Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isPresent()) {
             User user = userOpt.get();
             if (request.getName() != null) user.setName(request.getName());
-            if (request.getPhone() != null) user.setPhone(request.getPhone());
-            if (request.getCity() != null) user.setCity(request.getCity());
+            if (user.getRole() == com.nykaa.notification_service.entity.Role.USER) {
+                if (request.getPhone() != null) user.setPhone(request.getPhone());
+                if (request.getCity() != null) user.setCity(request.getCity());
+            }
             if (request.getPassword() != null && !request.getPassword().isEmpty()) {
                 if (request.getOldPassword() == null || request.getOldPassword().isEmpty()) {
                     return ResponseEntity.badRequest().body("Old password is required to change password");
@@ -88,6 +65,22 @@ public class ProfileController {
                 user.setPassword(passwordEncoder.encode(request.getPassword()));
             }
             userRepository.save(user);
+
+            // Update preferences
+            Preference pref = preferenceRepository.findByUserUserId(user.getUserId());
+            if (pref != null) {
+                pref.setEmailOffers(request.isEmailOffers());
+                pref.setSmsOffers(request.isSmsOffers());
+                pref.setPushOffers(request.isPushOffers());
+                pref.setEmailNewsletters(request.isEmailNewsletters());
+                pref.setSmsNewsletters(request.isSmsNewsletters());
+                pref.setPushNewsletters(request.isPushNewsletters());
+                pref.setEmailOrders(request.isEmailOrders());
+                pref.setSmsOrders(request.isSmsOrders());
+                pref.setPushOrders(request.isPushOrders());
+                preferenceRepository.save(pref);
+            }
+
             return ResponseEntity.ok(user);
         }
 
@@ -101,6 +94,16 @@ public class ProfileController {
         private String city;
         private String password;
         private String oldPassword;
+        // Preferences
+        private boolean emailOffers;
+        private boolean smsOffers;
+        private boolean pushOffers;
+        private boolean emailNewsletters;
+        private boolean smsNewsletters;
+        private boolean pushNewsletters;
+        private boolean emailOrders;
+        private boolean smsOrders;
+        private boolean pushOrders;
 
         // Getters and setters
         public String getName() { return name; }
@@ -113,5 +116,23 @@ public class ProfileController {
         public void setPassword(String password) { this.password = password; }
         public String getOldPassword() { return oldPassword; }
         public void setOldPassword(String oldPassword) { this.oldPassword = oldPassword; }
+        public boolean isEmailOffers() { return emailOffers; }
+        public void setEmailOffers(boolean emailOffers) { this.emailOffers = emailOffers; }
+        public boolean isSmsOffers() { return smsOffers; }
+        public void setSmsOffers(boolean smsOffers) { this.smsOffers = smsOffers; }
+        public boolean isPushOffers() { return pushOffers; }
+        public void setPushOffers(boolean pushOffers) { this.pushOffers = pushOffers; }
+        public boolean isEmailNewsletters() { return emailNewsletters; }
+        public void setEmailNewsletters(boolean emailNewsletters) { this.emailNewsletters = emailNewsletters; }
+        public boolean isSmsNewsletters() { return smsNewsletters; }
+        public void setSmsNewsletters(boolean smsNewsletters) { this.smsNewsletters = smsNewsletters; }
+        public boolean isPushNewsletters() { return pushNewsletters; }
+        public void setPushNewsletters(boolean pushNewsletters) { this.pushNewsletters = pushNewsletters; }
+        public boolean isEmailOrders() { return emailOrders; }
+        public void setEmailOrders(boolean emailOrders) { this.emailOrders = emailOrders; }
+        public boolean isSmsOrders() { return smsOrders; }
+        public void setSmsOrders(boolean smsOrders) { this.smsOrders = smsOrders; }
+        public boolean isPushOrders() { return pushOrders; }
+        public void setPushOrders(boolean pushOrders) { this.pushOrders = pushOrders; }
     }
 }

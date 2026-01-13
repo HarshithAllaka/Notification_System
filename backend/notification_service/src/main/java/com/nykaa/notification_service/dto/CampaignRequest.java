@@ -10,4 +10,5 @@ public class CampaignRequest {
     private String content;
     private String schedule;
     private List<String> targetCities; // Support multiple cities
+    private List<String> channels; // Channels to send: EMAIL, SMS, PUSH
 }

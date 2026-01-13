@@ -1,8 +1,7 @@
 package com.nykaa.notification_service.controller;
 
-import com.nykaa.notification_service.entity.Staff;
 import com.nykaa.notification_service.entity.User;
-import com.nykaa.notification_service.repository.StaffRepository;
+import com.nykaa.notification_service.repository.UserRepository;
 import com.nykaa.notification_service.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -10,6 +9,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin") // Matches frontend calls like /api/admin/users/...
@@ -17,7 +17,7 @@ import java.util.List;
 public class AdminController {
 
     private final UserService userService;
-    private final StaffRepository staffRepository;
+    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
     // --- USER MANAGEMENT ENDPOINTS ---
@@ -53,20 +53,27 @@ public class AdminController {
     // --- STAFF MANAGEMENT ENDPOINTS ---
 
     @GetMapping("/all")
-    public ResponseEntity<List<Staff>> getAllStaff() {
-        return ResponseEntity.ok(staffRepository.findAll());
+    public ResponseEntity<List<User>> getAllStaff() {
+        List<User> staff = userService.getAllUsers().stream()
+            .filter(u -> u.getRole() != com.nykaa.notification_service.entity.Role.USER)
+            .collect(Collectors.toList());
+        return ResponseEntity.ok(staff);
     }
 
     @PostMapping("/create-staff")
-    public ResponseEntity<String> createStaff(@RequestBody Staff staff) {
-        staff.setPassword(passwordEncoder.encode(staff.getPassword()));
-        staffRepository.save(staff);
+    public ResponseEntity<String> createStaff(@RequestBody User staff) {
+        // Set defaults for staff
+        staff.setUserId(java.util.UUID.randomUUID().toString());
+        staff.setActive(true);
+        staff.setPhone(null);
+        staff.setCity(null);
+        userService.createUserManually(staff);
         return ResponseEntity.ok("Staff member created");
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteStaff(@PathVariable Long id) {
-        staffRepository.deleteById(id);
+        userRepository.findById(id).ifPresent(userRepository::delete);
         return ResponseEntity.ok("Staff removed");
     }
 }

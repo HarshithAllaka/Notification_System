@@ -10,4 +10,5 @@ public class RecipientDto {
     private String email;
     private String status; // "SENT"
     private String sentAt;
+    private String channel; // EMAIL, SMS, PUSH
 }

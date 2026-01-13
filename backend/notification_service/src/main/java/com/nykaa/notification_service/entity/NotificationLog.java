@@ -16,4 +16,5 @@ public class NotificationLog {
     private Long campaignId;
     private LocalDateTime sentAt;
     private String status;
+    private String channel; // EMAIL, SMS, PUSH
 }

@@ -15,7 +15,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/users")
@@ -53,7 +56,15 @@ public class UserController {
         existing.setOffers(updatedPref.isOffers());
         existing.setNewsletter(updatedPref.isNewsletter());
         existing.setOrderUpdates(updatedPref.isOrderUpdates());
-        
+        existing.setEmailOffers(updatedPref.isEmailOffers());
+        existing.setSmsOffers(updatedPref.isSmsOffers());
+        existing.setPushOffers(updatedPref.isPushOffers());
+        existing.setEmailNewsletters(updatedPref.isEmailNewsletters());
+        existing.setSmsNewsletters(updatedPref.isSmsNewsletters());
+        existing.setPushNewsletters(updatedPref.isPushNewsletters());
+        existing.setEmailOrders(updatedPref.isEmailOrders());
+        existing.setSmsOrders(updatedPref.isSmsOrders());
+        existing.setPushOrders(updatedPref.isPushOrders());
         return ResponseEntity.ok(preferenceRepository.save(existing));
     }
 
@@ -67,21 +78,28 @@ public class UserController {
                 .filter(log -> log.getUserId().equals(userId))
                 .collect(Collectors.toList());
 
-        List<NotificationDto> notifications = logs.stream().map(log -> {
-            Campaign c = campaignRepository.findById(log.getCampaignId()).orElse(null);
-            NotificationDto dto = new NotificationDto();
-            if (c != null) {
-                dto.setMessage(c.getCampaignName());
-                dto.setContent(c.getContent());
-                dto.setType(c.getType()); // <--- SET THE TYPE HERE
-            } else {
-                dto.setMessage("System Message");
-                dto.setContent("Notification details unavailable");
-                dto.setType("PUSH");
-            }
-            dto.setReceivedAt(log.getSentAt());
-            return dto;
-        }).collect(Collectors.toList());
+        // Group by campaignId
+        Map<Long, List<NotificationLog>> groupedLogs = logs.stream()
+                .collect(Collectors.groupingBy(NotificationLog::getCampaignId));
+
+        List<NotificationDto> notifications = groupedLogs.entrySet().stream().map(entry -> {
+            Long campaignId = entry.getKey();
+            List<NotificationLog> campaignLogs = entry.getValue();
+            Campaign c = campaignRepository.findById(campaignId).orElse(null);
+            if (c == null) return null;
+
+            List<String> channels = campaignLogs.stream()
+                    .map(NotificationLog::getChannel)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            LocalDateTime latestSentAt = campaignLogs.stream()
+                    .map(NotificationLog::getSentAt)
+                    .max(LocalDateTime::compareTo)
+                    .orElse(LocalDateTime.now());
+
+            return new NotificationDto(c.getCampaignName(), c.getContent(), c.getType(), channels, latestSentAt);
+        }).filter(Objects::nonNull).collect(Collectors.toList());
 
         return ResponseEntity.ok(notifications);
     }

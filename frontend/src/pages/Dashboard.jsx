@@ -318,8 +318,8 @@ const Dashboard = () => {
              </div>
              <div className="p-6 max-h-80 overflow-y-auto">
                 <table className="w-full text-sm text-left">
-                   <thead className="bg-gray-50"><tr><th className="p-2">Name</th><th className="p-2">Email</th><th className="p-2">Status</th></tr></thead>
-                   <tbody>{recipients.map((r,i)=><tr key={i} className="border-b"><td className="p-2">{r.name}</td><td className="p-2">{r.email}</td><td className="p-2 text-green-600 font-bold">{r.status}</td></tr>)}</tbody>
+                   <thead className="bg-gray-50"><tr><th className="p-2">Name</th><th className="p-2">Email</th><th className="p-2">Channel</th><th className="p-2">Status</th></tr></thead>
+                   <tbody>{recipients.map((r,i)=><tr key={i} className="border-b"><td className="p-2">{r.name}</td><td className="p-2">{r.email}</td><td className="p-2">{r.channel}</td><td className="p-2 text-green-600 font-bold">{r.status}</td></tr>)}</tbody>
                 </table>
              </div>
              <div className="p-4 border-t flex justify-end bg-gray-50">

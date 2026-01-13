@@ -15,7 +15,16 @@ const Profile = () => {
     phone: '',
     city: '',
     password: '',
-    oldPassword: ''
+    oldPassword: '',
+    emailOffers: true,
+    smsOffers: true,
+    pushOffers: true,
+    emailNewsletters: true,
+    smsNewsletters: true,
+    pushNewsletters: true,
+    emailOrders: true,
+    smsOrders: true,
+    pushOrders: true
   });
 
   useEffect(() => {
@@ -32,7 +41,16 @@ const Profile = () => {
         phone: data.phone || '',
         city: data.city || '',
         password: '',
-        oldPassword: ''
+        oldPassword: '',
+        emailOffers: data.preference?.emailOffers ?? true,
+        smsOffers: data.preference?.smsOffers ?? true,
+        pushOffers: data.preference?.pushOffers ?? true,
+        emailNewsletters: data.preference?.emailNewsletters ?? true,
+        smsNewsletters: data.preference?.smsNewsletters ?? true,
+        pushNewsletters: data.preference?.pushNewsletters ?? true,
+        emailOrders: data.preference?.emailOrders ?? true,
+        smsOrders: data.preference?.smsOrders ?? true,
+        pushOrders: data.preference?.pushOrders ?? true
       });
     } catch (err) {
       toast.error('Failed to load profile');
@@ -173,6 +191,67 @@ const Profile = () => {
                         </div>
                       </>
                     )}
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                      <Shield size={20} />
+                      Notification Preferences
+                    </h4>
+                    
+                    <div className="bg-gray-50 p-4 rounded-xl space-y-4">
+                      <h5 className="font-medium text-gray-700">Promotion Offers</h5>
+                      <div className="grid grid-cols-3 gap-4">
+                        <label className="flex items-center gap-2">
+                          <input type="checkbox" checked={formData.emailOffers} onChange={(e) => setFormData({ ...formData, emailOffers: e.target.checked })} />
+                          <span className="text-sm">Email</span>
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input type="checkbox" checked={formData.smsOffers} onChange={(e) => setFormData({ ...formData, smsOffers: e.target.checked })} />
+                          <span className="text-sm">SMS</span>
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input type="checkbox" checked={formData.pushOffers} onChange={(e) => setFormData({ ...formData, pushOffers: e.target.checked })} />
+                          <span className="text-sm">Push</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 p-4 rounded-xl space-y-4">
+                      <h5 className="font-medium text-gray-700">Newsletters</h5>
+                      <div className="grid grid-cols-3 gap-4">
+                        <label className="flex items-center gap-2">
+                          <input type="checkbox" checked={formData.emailNewsletters} onChange={(e) => setFormData({ ...formData, emailNewsletters: e.target.checked })} />
+                          <span className="text-sm">Email</span>
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input type="checkbox" checked={formData.smsNewsletters} onChange={(e) => setFormData({ ...formData, smsNewsletters: e.target.checked })} />
+                          <span className="text-sm">SMS</span>
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input type="checkbox" checked={formData.pushNewsletters} onChange={(e) => setFormData({ ...formData, pushNewsletters: e.target.checked })} />
+                          <span className="text-sm">Push</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 p-4 rounded-xl space-y-4">
+                      <h5 className="font-medium text-gray-700">Order Updates</h5>
+                      <div className="grid grid-cols-3 gap-4">
+                        <label className="flex items-center gap-2">
+                          <input type="checkbox" checked={formData.emailOrders} onChange={(e) => setFormData({ ...formData, emailOrders: e.target.checked })} />
+                          <span className="text-sm">Email</span>
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input type="checkbox" checked={formData.smsOrders} onChange={(e) => setFormData({ ...formData, smsOrders: e.target.checked })} />
+                          <span className="text-sm">SMS</span>
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input type="checkbox" checked={formData.pushOrders} onChange={(e) => setFormData({ ...formData, pushOrders: e.target.checked })} />
+                          <span className="text-sm">Push</span>
+                        </label>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="space-y-2">

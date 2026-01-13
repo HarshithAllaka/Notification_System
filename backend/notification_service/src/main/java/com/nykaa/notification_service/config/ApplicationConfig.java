@@ -1,8 +1,6 @@
 package com.nykaa.notification_service.config;
 
-import com.nykaa.notification_service.entity.Staff;
 import com.nykaa.notification_service.entity.User;
-import com.nykaa.notification_service.repository.StaffRepository;
 import com.nykaa.notification_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -22,23 +20,11 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ApplicationConfig {
 
-    private final StaffRepository staffRepository;
     private final UserRepository userRepository;
 
     @Bean
     public UserDetailsService userDetailsService() {
         return username -> {
-            // 1. Try Staff
-            Optional<Staff> staff = staffRepository.findByEmail(username);
-            if (staff.isPresent()) {
-                return org.springframework.security.core.userdetails.User.builder()
-                        .username(staff.get().getEmail())
-                        .password(staff.get().getPassword())
-                        .authorities(staff.get().getRole().name())
-                        .build();
-            }
-
-            // 2. Try User
             Optional<User> user = userRepository.findByEmail(username);
             if (user.isPresent()) {
                 return org.springframework.security.core.userdetails.User.builder()

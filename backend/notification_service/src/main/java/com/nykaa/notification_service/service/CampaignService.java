@@ -56,17 +56,32 @@ public class CampaignService {
             Preference pref = preferenceRepository.findByUserUserId(user.getUserId());
             if (pref == null) continue;
 
-            boolean shouldSend = false;
-            if ("EMAIL".equalsIgnoreCase(request.getType()) && pref.isNewsletter()) shouldSend = true;
-            else if ("SMS".equalsIgnoreCase(request.getType()) && pref.isOffers()) shouldSend = true;
-            else if ("PUSH".equalsIgnoreCase(request.getType()) && pref.isOrderUpdates()) shouldSend = true;
-            else if (request.getType() == null) shouldSend = true;
+            // Send via channels selected in campaign, but only if user has opted in for that type
+            List<String> channelsToSend = new ArrayList<>();
+            for (String channel : request.getChannels()) {
+                boolean optedIn = false;
+                if ("Promotion Offers".equalsIgnoreCase(request.getType())) {
+                    if ("EMAIL".equalsIgnoreCase(channel) && pref.isEmailOffers()) optedIn = true;
+                    else if ("SMS".equalsIgnoreCase(channel) && pref.isSmsOffers()) optedIn = true;
+                    else if ("PUSH".equalsIgnoreCase(channel) && pref.isPushOffers()) optedIn = true;
+                } else if ("Newsletters".equalsIgnoreCase(request.getType())) {
+                    if ("EMAIL".equalsIgnoreCase(channel) && pref.isEmailNewsletters()) optedIn = true;
+                    else if ("SMS".equalsIgnoreCase(channel) && pref.isSmsNewsletters()) optedIn = true;
+                    else if ("PUSH".equalsIgnoreCase(channel) && pref.isPushNewsletters()) optedIn = true;
+                } else if ("Order Updates".equalsIgnoreCase(request.getType())) {
+                    if ("EMAIL".equalsIgnoreCase(channel) && pref.isEmailOrders()) optedIn = true;
+                    else if ("SMS".equalsIgnoreCase(channel) && pref.isSmsOrders()) optedIn = true;
+                    else if ("PUSH".equalsIgnoreCase(channel) && pref.isPushOrders()) optedIn = true;
+                }
+                if (optedIn) channelsToSend.add(channel.toUpperCase());
+            }
 
-            if (shouldSend) {
+            for (String channel : channelsToSend) {
                 NotificationLog log = new NotificationLog();
                 log.setCampaignId(campaign.getId());
                 log.setUserId(user.getUserId());
                 log.setStatus("SENT");
+                log.setChannel(channel);
                 log.setSentAt(LocalDateTime.now());
                 logRepository.save(log);
             }
@@ -80,8 +95,8 @@ public class CampaignService {
         List<NotificationLog> logs = logRepository.findByCampaignId(campaignId);
         List<RecipientDto> report = new ArrayList<>();
         for (NotificationLog log : logs) {
-            userRepository.findById(log.getUserId()).ifPresent(user -> {
-                report.add(new RecipientDto(user.getName(), user.getEmail(), log.getStatus(), log.getSentAt().toString()));
+            userRepository.findByUserId(log.getUserId()).ifPresent(user -> {
+                report.add(new RecipientDto(user.getName(), user.getEmail(), log.getStatus(), log.getSentAt().toString(), log.getChannel()));
             });
         }
         return report;
