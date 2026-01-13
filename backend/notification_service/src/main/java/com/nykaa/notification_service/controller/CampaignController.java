@@ -4,17 +4,17 @@ import com.nykaa.notification_service.dto.CampaignRequest;
 import com.nykaa.notification_service.dto.RecipientDto;
 import com.nykaa.notification_service.entity.Campaign;
 import com.nykaa.notification_service.service.CampaignService;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/campaigns")
-@RequiredArgsConstructor
 public class CampaignController {
 
-    private final CampaignService campaignService;
+    @Autowired
+    private CampaignService campaignService;
 
     @PostMapping("/create")
     public ResponseEntity<String> createCampaign(@RequestBody CampaignRequest request) {

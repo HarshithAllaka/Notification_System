@@ -9,6 +9,7 @@ import com.nykaa.notification_service.repository.NotificationLogRepository;
 import com.nykaa.notification_service.repository.PreferenceRepository;
 import com.nykaa.notification_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -19,13 +20,16 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/users")
-@RequiredArgsConstructor
 public class UserController {
 
-    private final UserRepository userRepository;
-    private final PreferenceRepository preferenceRepository;
-    private final NotificationLogRepository logRepository;
-    private final CampaignRepository campaignRepository;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private PreferenceRepository preferenceRepository;
+    @Autowired
+    private NotificationLogRepository logRepository;
+    @Autowired
+    private CampaignRepository campaignRepository;
 
     // Helper to get current logged-in user's email from the security token
     private String getCurrentUserEmail() {

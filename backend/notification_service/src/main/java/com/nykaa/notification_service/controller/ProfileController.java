@@ -4,7 +4,7 @@ import com.nykaa.notification_service.entity.Staff;
 import com.nykaa.notification_service.entity.User;
 import com.nykaa.notification_service.repository.StaffRepository;
 import com.nykaa.notification_service.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,12 +15,14 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/profile")
-@RequiredArgsConstructor
 public class ProfileController {
 
-    private final UserRepository userRepository;
-    private final StaffRepository staffRepository;
-    private final PasswordEncoder passwordEncoder;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private StaffRepository staffRepository;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     // Helper to get current logged-in user's email from the security token
     private String getCurrentUserEmail() {

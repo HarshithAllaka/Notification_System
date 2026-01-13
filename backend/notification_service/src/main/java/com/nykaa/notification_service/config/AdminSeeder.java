@@ -3,16 +3,17 @@ package com.nykaa.notification_service.config;
 import com.nykaa.notification_service.entity.Role;
 import com.nykaa.notification_service.entity.Staff;
 import com.nykaa.notification_service.repository.StaffRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 @Component
-@RequiredArgsConstructor
 public class AdminSeeder implements CommandLineRunner {
-    private final StaffRepository staffRepository;
-    private final PasswordEncoder passwordEncoder;
+    @Autowired
+    private StaffRepository staffRepository;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @Override
     public void run(String... args) {

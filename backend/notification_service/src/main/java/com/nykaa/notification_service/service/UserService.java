@@ -5,7 +5,7 @@ import com.nykaa.notification_service.entity.Role;
 import com.nykaa.notification_service.entity.User;
 import com.nykaa.notification_service.repository.PreferenceRepository;
 import com.nykaa.notification_service.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -13,12 +13,14 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class UserService {
 
-    private final UserRepository userRepository;
-    private final PreferenceRepository preferenceRepository;
-    private final PasswordEncoder passwordEncoder;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private PreferenceRepository preferenceRepository;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     // --- 1. Register User (Public Sign Up) ---
     public User registerUser(User user) {

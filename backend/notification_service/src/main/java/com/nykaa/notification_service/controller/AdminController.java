@@ -4,7 +4,7 @@ import com.nykaa.notification_service.entity.Staff;
 import com.nykaa.notification_service.entity.User;
 import com.nykaa.notification_service.repository.StaffRepository;
 import com.nykaa.notification_service.service.UserService;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -13,12 +13,14 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin") // Matches frontend calls like /api/admin/users/...
-@RequiredArgsConstructor
 public class AdminController {
 
-    private final UserService userService;
-    private final StaffRepository staffRepository;
-    private final PasswordEncoder passwordEncoder;
+    @Autowired
+    private UserService userService;
+    @Autowired
+    private StaffRepository staffRepository;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     // --- USER MANAGEMENT ENDPOINTS ---
 

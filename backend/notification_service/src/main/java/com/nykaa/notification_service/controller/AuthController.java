@@ -7,11 +7,9 @@ import com.nykaa.notification_service.entity.User;
 import com.nykaa.notification_service.repository.StaffRepository;
 import com.nykaa.notification_service.service.UserService;
 import com.nykaa.notification_service.config.JwtService;
-import lombok.RequiredArgsConstructor;
-import lombok.Data;
-import lombok.AllArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -23,15 +21,18 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
-@RequiredArgsConstructor
 public class AuthController {
 
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
 
-    private final AuthenticationManager authenticationManager;
-    private final UserService userService;
-    private final StaffRepository staffRepository;
-    private final JwtService jwtService;
+    @Autowired
+    private AuthenticationManager authenticationManager;
+    @Autowired
+    private UserService userService;
+    @Autowired
+    private StaffRepository staffRepository;
+    @Autowired
+    private JwtService jwtService;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
@@ -96,14 +97,73 @@ public class AuthController {
     }
 
     // --- UPDATED RESPONSE DTO ---
-    @Data
-    @AllArgsConstructor
     static class AuthResponse {
         private String token;
         private String role;
         private String name;
-        private String id;    // Added this
-        private String email; // Added this
-        private String city;  // Added this
+        private String id;
+        private String email;
+        private String city;
+
+        // Constructors
+        public AuthResponse() {}
+
+        public AuthResponse(String token, String role, String name, String id, String email, String city) {
+            this.token = token;
+            this.role = role;
+            this.name = name;
+            this.id = id;
+            this.email = email;
+            this.city = city;
+        }
+
+        // Getters and Setters
+        public String getToken() {
+            return token;
+        }
+
+        public void setToken(String token) {
+            this.token = token;
+        }
+
+        public String getRole() {
+            return role;
+        }
+
+        public void setRole(String role) {
+            this.role = role;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public String getEmail() {
+            return email;
+        }
+
+        public void setEmail(String email) {
+            this.email = email;
+        }
+
+        public String getCity() {
+            return city;
+        }
+
+        public void setCity(String city) {
+            this.city = city;
+        }
     }
 }

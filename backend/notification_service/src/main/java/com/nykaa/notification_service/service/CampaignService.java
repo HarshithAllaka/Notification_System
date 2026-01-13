@@ -4,7 +4,7 @@ import com.nykaa.notification_service.dto.CampaignRequest;
 import com.nykaa.notification_service.dto.RecipientDto;
 import com.nykaa.notification_service.entity.*;
 import com.nykaa.notification_service.repository.*;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,13 +13,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class CampaignService {
 
-    private final CampaignRepository campaignRepository;
-    private final UserRepository userRepository;
-    private final PreferenceRepository preferenceRepository;
-    private final NotificationLogRepository logRepository;
+    @Autowired
+    private CampaignRepository campaignRepository;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private PreferenceRepository preferenceRepository;
+    @Autowired
+    private NotificationLogRepository logRepository;
 
     public void executeCampaign(CampaignRequest request) {
         System.out.println("Executing campaign with target cities: " + request.getTargetCities());
