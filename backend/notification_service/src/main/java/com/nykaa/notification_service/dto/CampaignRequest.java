@@ -1,6 +1,7 @@
 package com.nykaa.notification_service.dto;
 
 import lombok.Data;
+import java.util.List;
 
 @Data
 public class CampaignRequest {
@@ -8,5 +9,5 @@ public class CampaignRequest {
     private String type;
     private String content;
     private String schedule;
-    private String targetCity; // <--- ADD THIS
+    private List<String> targetCities; // Support multiple cities
 }

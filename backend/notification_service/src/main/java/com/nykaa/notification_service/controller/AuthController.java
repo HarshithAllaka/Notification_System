@@ -10,10 +10,13 @@ import com.nykaa.notification_service.config.JwtService;
 import lombok.RequiredArgsConstructor;
 import lombok.Data;
 import lombok.AllArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -23,50 +26,61 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuthController {
 
+    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
+
     private final AuthenticationManager authenticationManager;
     private final UserService userService;
     private final StaffRepository staffRepository;
     private final JwtService jwtService;
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
+        logger.info("Login attempt for email: {}", request.getEmail());
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+            );
+            logger.info("Authentication successful for email: {}", request.getEmail());
 
-        // 1. Check if Staff (Admin/Creator/Viewer)
-        Optional<Staff> staff = staffRepository.findByEmail(request.getEmail());
-        if (staff.isPresent()) {
-            String token = jwtService.generateToken(staff.get().getEmail(), staff.get().getRole().name());
-            // Staff don't use City/ID features in dashboard, so we send default values
+            // 1. Check if Staff (Admin/Creator/Viewer)
+            Optional<Staff> staff = staffRepository.findByEmail(request.getEmail());
+            if (staff.isPresent()) {
+                String token = jwtService.generateToken(staff.get().getEmail(), staff.get().getRole().name());
+                logger.info("Staff login successful: {} with role {}", staff.get().getEmail(), staff.get().getRole());
+                // Staff don't use City/ID features in dashboard, so we send default values
+                return ResponseEntity.ok(new AuthResponse(
+                    token, 
+                    staff.get().getRole().name(), 
+                    staff.get().getName(), 
+                    String.valueOf(staff.get().getId()), 
+                    staff.get().getEmail(), 
+                    "N/A"
+                ));
+            }
+
+            // 2. Check if User (Customer)
+            User user = userService.getUserProfile(request.getEmail());
+            String token = jwtService.generateToken(user.getEmail(), user.getRole().name());
+            logger.info("User login successful: {} with role {}", user.getEmail(), user.getRole());
+            
+            // --- THIS WAS THE MISSING PART ---
+            // We now send the ID and CITY so the frontend can find notifications
             return ResponseEntity.ok(new AuthResponse(
                 token, 
-                staff.get().getRole().name(), 
-                staff.get().getName(), 
-                String.valueOf(staff.get().getId()), 
-                staff.get().getEmail(), 
-                "N/A"
+                user.getRole().name(), 
+                user.getName(), 
+                user.getUserId(), // <--- CRITICAL FIX
+                user.getEmail(), 
+                user.getCity()    // <--- CRITICAL FIX
             ));
+        } catch (Exception e) {
+            logger.warn("Login failed for email: {} - {}", request.getEmail(), e.getMessage());
+            throw e;
         }
-
-        // 2. Check if User (Customer)
-        User user = userService.getUserProfile(request.getEmail());
-        String token = jwtService.generateToken(user.getEmail(), user.getRole().name());
-        
-        // --- THIS WAS THE MISSING PART ---
-        // We now send the ID and CITY so the frontend can find notifications
-        return ResponseEntity.ok(new AuthResponse(
-            token, 
-            user.getRole().name(), 
-            user.getName(), 
-            user.getUserId(), // <--- CRITICAL FIX
-            user.getEmail(), 
-            user.getCity()    // <--- CRITICAL FIX
-        ));
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
         User user = new User();
         user.setUserId(UUID.randomUUID().toString());
         user.setName(request.getName());

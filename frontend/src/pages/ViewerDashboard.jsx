@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
-import { LogOut, BarChart3, Download, FileText, Calendar, Filter, Tag, Mail, ShoppingBag } from 'lucide-react';
+import { LogOut, BarChart3, Download, FileText, Calendar, Filter, Tag, Mail, ShoppingBag, User } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const ViewerDashboard = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('CAMPAIGNS');
   const [campaigns, setCampaigns] = useState([]);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [recipients, setRecipients] = useState([]);
@@ -12,7 +14,11 @@ const ViewerDashboard = () => {
 
   useEffect(() => {
     const fetchHistory = async () => {
-       try { const { data } = await api.get('/campaigns/history'); setCampaigns(data); } catch (err) {}
+       try { 
+         const { data } = await api.get('/campaigns/history');
+         const sortedCampaigns = data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+         setCampaigns(sortedCampaigns);
+       } catch (err) {}
     };
     fetchHistory();
   }, []);
@@ -53,8 +59,12 @@ const ViewerDashboard = () => {
         <div className="p-6 border-b border-gray-100">
            <h2 className="text-2xl font-extrabold text-blue-600">Nykaa Viewer</h2>
         </div>
-        <div className="flex-1 p-4">
-           <button className="w-full flex items-center gap-3 px-4 py-3 bg-blue-50 text-blue-700 rounded-xl font-medium"><BarChart3 className="w-5 h-5"/> Reports Portal</button>
+        <div className="flex-1 p-4 space-y-2">
+           <button onClick={() => setActiveTab('CAMPAIGNS')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition ${activeTab === 'CAMPAIGNS' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}><BarChart3 className="w-5 h-5"/> Reports Portal</button>
+           <button onClick={() => setActiveTab('ANALYTICS')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition ${activeTab === 'ANALYTICS' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}><BarChart3 className="w-5 h-5"/> Analytics</button>
+           <button onClick={() => navigate('/profile')} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-600 hover:bg-gray-100">
+             <User className="w-5 h-5" /> My Profile
+           </button>
         </div>
         <div className="p-4 border-t border-gray-100">
            <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl font-medium transition"><LogOut className="w-5 h-5"/> Logout</button>
@@ -64,10 +74,33 @@ const ViewerDashboard = () => {
       {/* Content */}
       <main className="flex-1 p-8">
          <header className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Campaign Analytics</h1>
-            <p className="text-gray-500 mt-1">View historical data and download delivery reports.</p>
+            <h1 className="text-3xl font-bold text-gray-900">{activeTab === 'CAMPAIGNS' ? 'Campaign Reports' : 'Campaign Analytics'}</h1>
+            <p className="text-gray-500 mt-1">{activeTab === 'CAMPAIGNS' ? 'View historical data and download delivery reports.' : 'View your campaign performance metrics.'}</p>
          </header>
 
+         {activeTab === 'ANALYTICS' && (
+           <div className="grid grid-cols-1 gap-8 mb-8">
+             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+               <h3 className="text-lg font-bold text-gray-800 mb-4">Campaign Types Distribution</h3>
+               <ResponsiveContainer width="100%" height={300}>
+                 <BarChart data={[
+                   { name: 'promotion offers', count: campaigns.filter(c => c.type === 'SMS').length },
+                   { name: 'Newsletters', count: campaigns.filter(c => c.type === 'EMAIL').length },
+                   { name: 'orders', count: campaigns.filter(c => c.type === 'PUSH').length }
+                 ]}>
+                   <CartesianGrid strokeDasharray="3 3" />
+                   <XAxis dataKey="name" />
+                   <YAxis />
+                   <Tooltip />
+                   <Bar dataKey="count" fill="#3b82f6" />
+                 </BarChart>
+               </ResponsiveContainer>
+             </div>
+           </div>
+         )}
+
+         {activeTab === 'CAMPAIGNS' && (
+         <>
          {/* FILTERS */}
          <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
             {filters.map(f => (
@@ -79,7 +112,7 @@ const ViewerDashboard = () => {
 
          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <table className="w-full text-sm text-left">
-               <thead className="bg-gray-50 text-gray-500"><tr><th className="p-4">Campaign Name</th><th className="p-4">Type</th><th className="p-4">Sent Date</th><th className="p-4">Actions</th></tr></thead>
+               <thead className="bg-gray-50 text-gray-500"><tr><th className="p-4">Campaign Name</th><th className="p-4">Type</th><th className="p-4">Target Cities</th><th className="p-4">Sent Date</th><th className="p-4">Actions</th></tr></thead>
                <tbody className="divide-y divide-gray-100">
                  {getFilteredCampaigns().map((c, i) => (
                    <tr key={i} className="hover:bg-gray-50 transition">
@@ -88,6 +121,9 @@ const ViewerDashboard = () => {
                          <span className={`px-2 py-1 rounded text-xs uppercase font-bold ${c.type==='SMS'?'bg-blue-100 text-blue-700':c.type==='EMAIL'?'bg-yellow-100 text-yellow-700':'bg-green-100 text-green-700'}`}>
                              {c.type==='SMS'?'PROMO':c.type==='EMAIL'?'NEWS':'ORDER'}
                          </span>
+                      </td>
+                      <td className="p-4 text-gray-600 text-sm">
+                         {c.targetCities && c.targetCities.length > 0 ? c.targetCities.join(', ') : (c.targetCity ? c.targetCity : "Global")}
                       </td>
                       <td className="p-4 text-gray-500 flex items-center gap-2"><Calendar className="w-4 h-4 text-gray-400"/> {new Date(c.createdAt).toLocaleDateString()}</td>
                       <td className="p-4">
@@ -98,6 +134,8 @@ const ViewerDashboard = () => {
                </tbody>
             </table>
          </div>
+         </>
+         )}
       </main>
 
       {/* Modal */}

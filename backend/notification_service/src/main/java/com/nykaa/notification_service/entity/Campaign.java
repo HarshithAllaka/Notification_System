@@ -3,6 +3,7 @@ package com.nykaa.notification_service.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Data
@@ -13,12 +14,18 @@ public class Campaign {
     private Long id;
 
     private String campaignName;
-    private String type; // EMAIL, SMS, PUSH
+    private String type; 
     
     @Column(length = 1000)
     private String content;
     
-    private String targetCity; // <--- ADD THIS
+    @ElementCollection
+    @CollectionTable(name = "campaign_target_cities", joinColumns = @JoinColumn(name = "campaign_id"))
+    @Column(name = "city")
+    private List<String> targetCities; // Support multiple cities
+    
+    // Keep this for backward compatibility
+    private String targetCity;
     
     private LocalDateTime createdAt;
 }

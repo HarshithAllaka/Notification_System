@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
-import { LogOut, Bell, Settings, CheckCircle2, MapPin, ShoppingBag, Tag, Mail } from 'lucide-react';
+import { LogOut, Bell, Settings, CheckCircle2, MapPin, ShoppingBag, Tag, Mail, User } from 'lucide-react';
 
 const UserHome = () => {
   const navigate = useNavigate();
@@ -25,7 +25,8 @@ const UserHome = () => {
            api.get('/users/notifications'),
            api.get('/users/preferences')
         ]);
-        setNotifications(notifRes.data);
+        const sortedNotifications = notifRes.data.sort((a, b) => new Date(b.receivedAt) - new Date(a.receivedAt));
+        setNotifications(sortedNotifications);
         setPref(prefRes.data);
       } catch (err) {
         if(err.response && (err.response.status === 403 || err.response.status === 401)) {
@@ -61,7 +62,12 @@ const UserHome = () => {
     <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
        <nav className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center shadow-sm">
           <div className="flex items-center gap-2 text-pink-600 font-extrabold text-2xl"><span>Nykaa.</span></div>
-          <button onClick={handleLogout} className="text-gray-500 hover:text-red-600 font-medium flex items-center gap-2 transition"><LogOut className="w-5 h-5"/> Sign Out</button>
+          <div className="flex items-center gap-4">
+            <button onClick={() => navigate('/profile')} className="text-gray-500 hover:text-blue-600 font-medium flex items-center gap-2 transition">
+              <User className="w-5 h-5"/> Profile
+            </button>
+            <button onClick={handleLogout} className="text-gray-500 hover:text-red-600 font-medium flex items-center gap-2 transition"><LogOut className="w-5 h-5"/> Sign Out</button>
+          </div>
        </nav>
 
        <div className="max-w-6xl mx-auto mt-10 p-6 grid grid-cols-1 lg:grid-cols-4 gap-8">

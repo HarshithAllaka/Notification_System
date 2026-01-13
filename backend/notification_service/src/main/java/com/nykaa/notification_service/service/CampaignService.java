@@ -22,11 +22,12 @@ public class CampaignService {
     private final NotificationLogRepository logRepository;
 
     public void executeCampaign(CampaignRequest request) {
+        System.out.println("Executing campaign with target cities: " + request.getTargetCities());
         Campaign campaign = new Campaign();
         campaign.setCampaignName(request.getName());
         campaign.setType(request.getType());
         campaign.setContent(request.getContent());
-        campaign.setTargetCity(request.getTargetCity()); // Save the city filter
+        campaign.setTargetCities(request.getTargetCities()); // Save target cities
         campaign.setCreatedAt(LocalDateTime.now());
         campaignRepository.save(campaign);
 
@@ -34,14 +35,23 @@ public class CampaignService {
         for (User user : users) {
             if (!user.isActive()) continue;
 
-            // --- NEW CITY FILTER LOGIC ---
-            // If a target city is set, AND the user's city doesn't match, SKIP them.
-            if (request.getTargetCity() != null && !request.getTargetCity().trim().isEmpty()) {
-                if (user.getCity() == null || !user.getCity().equalsIgnoreCase(request.getTargetCity().trim())) {
-                    continue; 
+            // --- CITY FILTER LOGIC FOR MULTIPLE CITIES ---
+            // Check targetCities (new format)
+            if (request.getTargetCities() != null && !request.getTargetCities().isEmpty()) {
+                // If "All Cities" is selected, skip the city filter
+                if (!request.getTargetCities().contains("All Cities")) {
+                    // Check if user's city is in the target cities list
+                    if (user.getCity() == null || 
+                        !request.getTargetCities().stream()
+                            .anyMatch(city -> city.equalsIgnoreCase(user.getCity()))) {
+                        System.out.println("Skipping user " + user.getUserId() + " in city " + user.getCity() + " for target cities " + request.getTargetCities());
+                        continue; // Skip this user if their city is not in target list
+                    }
                 }
+            } else {
+                System.out.println("No target cities specified, sending to all");
             }
-            // -----------------------------
+            // -----------------------------------------------
 
             Preference pref = preferenceRepository.findByUserUserId(user.getUserId());
             if (pref == null) continue;
@@ -84,7 +94,7 @@ public class CampaignService {
         campaignRepository.deleteById(id);
     }
 
-    // Update Campaign with City support
+    // Update Campaign with multiple cities support
     public Campaign updateCampaign(Long id, CampaignRequest request) {
         Campaign existing = campaignRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Campaign not found"));
@@ -92,7 +102,7 @@ public class CampaignService {
         existing.setCampaignName(request.getName());
         existing.setType(request.getType());
         existing.setContent(request.getContent());
-        existing.setTargetCity(request.getTargetCity()); // Update city
+        existing.setTargetCities(request.getTargetCities()); // Update target cities
         
         return campaignRepository.save(existing);
     }

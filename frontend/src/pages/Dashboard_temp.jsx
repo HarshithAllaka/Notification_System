@@ -44,8 +44,7 @@ const Dashboard = () => {
       ]);
       setUsers(userRes.data);
       setStaff(staffRes.data);
-      const sortedCampaigns = campRes.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      setCampaigns(sortedCampaigns);
+      setCampaigns(campRes.data);
     } catch (err) { console.error("Error loading data", err); }
   };
 
@@ -199,7 +198,8 @@ const Dashboard = () => {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    label={({ name, percent }) => ${name} %}
+                    outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
                   >
@@ -220,9 +220,9 @@ const Dashboard = () => {
               <h3 className="text-lg font-bold text-gray-800 mb-4">Campaign Types</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={[
-                  { name: 'promotion offers', count: campaigns.filter(c => c.type === 'SMS').length },
-                  { name: 'Newsletters', count: campaigns.filter(c => c.type === 'EMAIL').length },
-                  { name: 'orders', count: campaigns.filter(c => c.type === 'PUSH').length }
+                  { name: 'SMS', count: campaigns.filter(c => c.type === 'SMS').length },
+                  { name: 'EMAIL', count: campaigns.filter(c => c.type === 'EMAIL').length },
+                  { name: 'PUSH', count: campaigns.filter(c => c.type === 'PUSH').length }
                 ]}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
@@ -267,11 +267,64 @@ const Dashboard = () => {
            </div>
         )}
 
+        {activeTab === 'ANALYTICS' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">User Distribution</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'Customers', value: users.length, color: '#ec4899' },
+                      { name: 'Admins', value: staff.filter(s => s.role === 'ADMIN').length, color: '#8b5cf6' },
+                      { name: 'Creators', value: staff.filter(s => s.role === 'CREATOR').length, color: '#10b981' },
+                      { name: 'Viewers', value: staff.filter(s => s.role === 'VIEWER').length, color: '#3b82f6' }
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => ${name} %}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {[
+                      { name: 'Customers', value: users.length, color: '#ec4899' },
+                      { name: 'Admins', value: staff.filter(s => s.role === 'ADMIN').length, color: '#8b5cf6' },
+                      { name: 'Creators', value: staff.filter(s => s.role === 'CREATOR').length, color: '#10b981' },
+                      { name: 'Viewers', value: staff.filter(s => s.role === 'VIEWER').length, color: '#3b82f6' }
+                    ].map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">Campaign Types</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={[
+                  { name: 'SMS', count: campaigns.filter(c => c.type === 'SMS').length },
+                  { name: 'EMAIL', count: campaigns.filter(c => c.type === 'EMAIL').length },
+                  { name: 'PUSH', count: campaigns.filter(c => c.type === 'PUSH').length }
+                ]}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#ec4899" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'CAMPAIGNS' && (
           <div>
             {/* NEW FILTER TABS */}
             <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-                {[{id:'ALL',label:'All',icon:Filter},{id:'SMS',label:'promotion offers',icon:Tag},{id:'EMAIL',label:'Newsletters',icon:Mail},{id:'PUSH',label:'orders',icon:ShoppingBag}].map(f => (
+                {[{id:'ALL',label:'All',icon:Filter},{id:'SMS',label:'Promotions',icon:Tag},{id:'EMAIL',label:'Newsletters',icon:Mail},{id:'PUSH',label:'Orders',icon:ShoppingBag}].map(f => (
                     <button key={f.id} onClick={() => setFilterType(f.id)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition whitespace-nowrap ${filterType === f.id ? 'bg-pink-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-pink-50'}`}>
                         <f.icon className="w-4 h-4"/> {f.label}
                     </button>
@@ -280,18 +333,15 @@ const Dashboard = () => {
 
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <table className="w-full text-sm text-left">
-                <thead className="bg-gray-50 text-gray-500"><tr><th className="p-4">Campaign</th><th className="p-4">Target Cities</th><th className="p-4">Date</th><th className="p-4 text-right">Actions</th></tr></thead>
+                <thead className="bg-gray-50 text-gray-500"><tr><th className="p-4">Campaign</th><th className="p-4">Date</th><th className="p-4 text-right">Actions</th></tr></thead>
                 <tbody className="divide-y divide-gray-100">
                     {getFilteredCampaigns().map(c => (
                     <tr key={c.id} className="hover:bg-gray-50">
                         <td className="p-4">
                         <div className="font-bold text-gray-900">{c.campaignName}</div>
                         <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${c.type==='SMS'?'bg-blue-100 text-blue-700':c.type==='EMAIL'?'bg-yellow-100 text-yellow-700':'bg-green-100 text-green-700'}`}>
-                             {c.type==='SMS'?'PROMOTION OFFERS':c.type==='EMAIL'?'NEWSLETTERS':'ORDERS'}
+                             {c.type==='SMS'?'PROMO':c.type==='EMAIL'?'NEWS':'ORDER'}
                         </span>
-                        </td>
-                        <td className="p-4 text-gray-600 text-sm">
-                            {c.targetCities && c.targetCities.length > 0 ? c.targetCities.join(', ') : (c.targetCity ? c.targetCity : "Global")}
                         </td>
                         <td className="p-4 text-gray-500">{new Date(c.createdAt).toLocaleDateString()}</td>
                         <td className="p-4 flex justify-end gap-3">
@@ -306,6 +356,58 @@ const Dashboard = () => {
           </div>
         )}
 
+        {activeTab === 'ANALYTICS' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">User Distribution</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'Customers', value: users.length, color: '#ec4899' },
+                      { name: 'Admins', value: staff.filter(s => s.role === 'ADMIN').length, color: '#8b5cf6' },
+                      { name: 'Creators', value: staff.filter(s => s.role === 'CREATOR').length, color: '#10b981' },
+                      { name: 'Viewers', value: staff.filter(s => s.role === 'VIEWER').length, color: '#3b82f6' }
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => ${name} %}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {[
+                      { name: 'Customers', value: users.length, color: '#ec4899' },
+                      { name: 'Admins', value: staff.filter(s => s.role === 'ADMIN').length, color: '#8b5cf6' },
+                      { name: 'Creators', value: staff.filter(s => s.role === 'CREATOR').length, color: '#10b981' },
+                      { name: 'Viewers', value: staff.filter(s => s.role === 'VIEWER').length, color: '#3b82f6' }
+                    ].map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">Campaign Types</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={[
+                  { name: 'SMS', count: campaigns.filter(c => c.type === 'SMS').length },
+                  { name: 'EMAIL', count: campaigns.filter(c => c.type === 'EMAIL').length },
+                  { name: 'PUSH', count: campaigns.filter(c => c.type === 'PUSH').length }
+                ]}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#ec4899" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* MODAL */}

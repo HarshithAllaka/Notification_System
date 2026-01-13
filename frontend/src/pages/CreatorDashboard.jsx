@@ -6,8 +6,9 @@ import 'react-toastify/dist/ReactToastify.css';
 import { 
   PenTool, Users, LogOut, Send, LayoutDashboard, 
   MapPin, MessageSquare, Plus, Edit2, FileText, Download,
-  Tag, Mail, ShoppingBag, Filter
+  Tag, Mail, ShoppingBag, Filter, User, BarChart3, Trash2
 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const CreatorDashboard = () => {
   const navigate = useNavigate();
@@ -16,16 +17,26 @@ const CreatorDashboard = () => {
   // Campaign State
   const [campaigns, setCampaigns] = useState([]);
   const [campaignData, setCampaignData] = useState({ 
-    name: '', type: 'SMS', content: '', schedule: '', targetCity: '' 
+    name: '', type: 'SMS', content: '', schedule: '', targetCities: [] 
   });
-  const [editingCampaign, setEditingCampaign] = useState(null); 
-  const [filterType, setFilterType] = useState('ALL'); // <--- NEW FILTER STATE
   
   // User State
   const [users, setUsers] = useState([]);
   const [userData, setUserData] = useState({ name: '', email: '', password: '', city: '', phone: '' });
   const [editingUser, setEditingUser] = useState(null);
   const [file, setFile] = useState(null);
+
+  // Campaign UI State
+  const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState(null);
+  const [filterType, setFilterType] = useState('ALL');
+  
+  // Dynamically get unique cities from users
+  const getAvailableCities = () => {
+    const uniqueCities = [...new Set(users.map(u => u.city).filter(Boolean))].sort();
+    return ['All Cities', ...uniqueCities];
+  };
+  const cities = getAvailableCities();
 
   // Reporting
   const [selectedCampaign, setSelectedCampaign] = useState(null);
@@ -39,7 +50,8 @@ const CreatorDashboard = () => {
         api.get('/campaigns/history'),
         api.get('/admin/users/all')
       ]);
-      setCampaigns(campRes.data);
+      const sortedCampaigns = campRes.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setCampaigns(sortedCampaigns);
       setUsers(userRes.data);
     } catch (err) { console.error("Failed to load data"); }
   };
@@ -57,7 +69,7 @@ const CreatorDashboard = () => {
         await api.post('/campaigns/create', campaignData);
         toast.success("Campaign Created!");
       }
-      setCampaignData({ name: '', type: 'SMS', content: '', schedule: '', targetCity: '' });
+      setCampaignData({ name: '', type: 'SMS', content: '', schedule: '', targetCities: [] });
       setEditingCampaign(null);
       fetchData();
     } catch (err) { toast.error("Operation failed."); }
@@ -65,10 +77,32 @@ const CreatorDashboard = () => {
 
   const startEditCampaign = (c) => {
     setEditingCampaign(c.id);
+    // Handle both new targetCities (array) and old targetCity (string) format
+    const cities = c.targetCities && c.targetCities.length > 0 
+      ? c.targetCities 
+      : (c.targetCity ? [c.targetCity] : []);
     setCampaignData({ 
-        name: c.campaignName, type: c.type, content: c.content, schedule: '', targetCity: c.targetCity || '' 
+        name: c.campaignName, type: c.type, content: c.content, schedule: '', targetCities: cities
     });
     setActiveTab('CAMPAIGNS'); window.scrollTo(0,0);
+  };
+
+  const handleCityToggle = (city) => {
+    if (city === 'All Cities') {
+      if (campaignData.targetCities.includes('All Cities')) {
+        setCampaignData({ ...campaignData, targetCities: [] });
+      } else {
+        setCampaignData({ ...campaignData, targetCities: ['All Cities'] });
+      }
+    } else {
+      let newCities = campaignData.targetCities.filter(c => c !== 'All Cities');
+      if (newCities.includes(city)) {
+        newCities = newCities.filter(c => c !== city);
+      } else {
+        newCities.push(city);
+      }
+      setCampaignData({ ...campaignData, targetCities: newCities });
+    }
   };
 
   const handleUserSubmit = async (e) => {
@@ -90,6 +124,17 @@ const CreatorDashboard = () => {
   const handleViewReport = async (camp) => {
     setSelectedCampaign(camp);
     try { const { data } = await api.get(`/campaigns/${camp.id}/recipients`); setRecipients(data); } catch (err) {}
+  };
+
+  const handleDeleteCampaign = async (campaignId) => {
+    if (!window.confirm("Are you sure? This cannot be undone.")) return;
+    try {
+      await api.delete(`/campaigns/${campaignId}`);
+      toast.success("Campaign deleted!");
+      fetchData();
+    } catch (err) {
+      toast.error("Failed to delete campaign.");
+    }
   };
 
   const downloadCSV = () => {
@@ -128,8 +173,14 @@ const CreatorDashboard = () => {
           <button onClick={() => setActiveTab('CAMPAIGNS')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${activeTab==='CAMPAIGNS'?'bg-purple-50 text-purple-700':'text-gray-600 hover:bg-gray-100'}`}>
             <PenTool className="w-5 h-5" /> Campaign Manager
           </button>
+          <button onClick={() => setActiveTab('ANALYTICS')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${activeTab==='ANALYTICS'?'bg-purple-50 text-purple-700':'text-gray-600 hover:bg-gray-100'}`}>
+            <BarChart3 className="w-5 h-5" /> Analytics
+          </button>
           <button onClick={() => setActiveTab('USERS')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${activeTab==='USERS'?'bg-purple-50 text-purple-700':'text-gray-600 hover:bg-gray-100'}`}>
             <Users className="w-5 h-5" /> Audience Base
+          </button>
+          <button onClick={() => navigate('/profile')} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium text-gray-600 hover:bg-gray-100">
+            <User className="w-5 h-5" /> My Profile
           </button>
         </nav>
         <div className="p-4 border-t border-gray-100">
@@ -142,9 +193,30 @@ const CreatorDashboard = () => {
       {/* MAIN */}
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="mb-8">
-           <h1 className="text-3xl font-bold text-gray-900">{activeTab === 'CAMPAIGNS' ? 'Campaign Orchestration' : 'Audience Management'}</h1>
-           <p className="text-gray-500 mt-1">Manage your marketing efforts and customer data.</p>
+           <h1 className="text-3xl font-bold text-gray-900">{activeTab === 'CAMPAIGNS' ? 'Campaign Orchestration' : activeTab === 'ANALYTICS' ? 'Campaign Analytics' : 'Audience Management'}</h1>
+           <p className="text-gray-500 mt-1">{activeTab === 'ANALYTICS' ? 'View your campaign performance metrics.' : 'Manage your marketing efforts and customer data.'}</p>
         </header>
+
+        {activeTab === 'ANALYTICS' && (
+          <div className="grid grid-cols-1 gap-8">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">Campaign Types Distribution</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={[
+                  { name: 'promotion offers', count: campaigns.filter(c => c.type === 'SMS').length },
+                  { name: 'Newsletters', count: campaigns.filter(c => c.type === 'EMAIL').length },
+                  { name: 'orders', count: campaigns.filter(c => c.type === 'PUSH').length }
+                ]}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#a855f7" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
 
         {activeTab === 'CAMPAIGNS' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -165,12 +237,33 @@ const CreatorDashboard = () => {
                       <option value="PUSH">Order Update</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Target City</label>
-                    <div className="relative">
-                        <MapPin className="absolute left-3 top-3 w-4 h-4 text-gray-400"/>
-                        <input type="text" placeholder="All Cities" className="w-full pl-9 bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" value={campaignData.targetCity} onChange={(e) => setCampaignData({...campaignData, targetCity: e.target.value})} />
-                    </div>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Target Cities</label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setCityDropdownOpen(!cityDropdownOpen)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                    >
+                      <span className="text-sm">{campaignData.targetCities.length === 0 ? 'Select cities...' : campaignData.targetCities.join(', ')}</span>
+                      <MapPin className="w-4 h-4 text-gray-400" />
+                    </button>
+                    {cityDropdownOpen && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg">
+                        {cities.map(city => (
+                          <label key={city} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
+                            <input
+                              type="checkbox"
+                              checked={campaignData.targetCities.includes(city)}
+                              onChange={() => handleCityToggle(city)}
+                              className="w-4 h-4 text-purple-600 rounded cursor-pointer"
+                            />
+                            <span className="text-sm flex-1">{city}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div>
@@ -211,10 +304,14 @@ const CreatorDashboard = () => {
                                 <span className="text-xs text-gray-400">{new Date(c.createdAt).toLocaleDateString()}</span>
                              </div>
                            </td>
-                           <td className="p-4 text-gray-600 flex items-center gap-1"><MapPin className="w-3 h-3"/> {c.targetCity || "Global"}</td>
+                           <td className="p-4 text-gray-600 flex items-center gap-1">
+                             <MapPin className="w-3 h-3"/> 
+                             {c.targetCities && c.targetCities.length > 0 ? c.targetCities.join(', ') : (c.targetCity ? c.targetCity : "Global")}
+                           </td>
                            <td className="p-4 text-right space-x-2">
                              <button onClick={() => startEditCampaign(c)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"><Edit2 className="w-4 h-4"/></button>
                              <button onClick={() => handleViewReport(c)} className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition"><FileText className="w-4 h-4"/></button>
+                             <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"><Trash2 className="w-4 h-4"/></button>
                            </td>
                          </tr>
                        ))}

@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import UserHome from './pages/UserHome';
 import CreatorDashboard from './pages/CreatorDashboard'; // <--- IMPORT
 import ViewerDashboard from './pages/ViewerDashboard';   // <--- IMPORT
+import Profile from './pages/Profile';   // <--- IMPORT
 
 function App() {
   const ProtectedRoute = ({ children }) => {
@@ -25,6 +26,7 @@ function App() {
         {/* NEW ROUTES */}
         <Route path="/creator-dashboard" element={<ProtectedRoute><CreatorDashboard /></ProtectedRoute>} />
         <Route path="/viewer-dashboard" element={<ProtectedRoute><ViewerDashboard /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
