@@ -6,9 +6,9 @@ import 'react-toastify/dist/ReactToastify.css';
 import { 
   Users, Briefcase, Megaphone, LogOut, UploadCloud, 
   Plus, Trash2, Edit2, Shield, Search, Power,
-  Filter, Tag, Mail, ShoppingBag, User, BarChart3
+  Filter, Tag, Mail, ShoppingBag, User, BarChart3, Package
 } from 'lucide-react';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -18,18 +18,21 @@ const Dashboard = () => {
   const [users, setUsers] = useState([]);
   const [staff, setStaff] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
+  const [products, setProducts] = useState([]); 
+  const [orders, setOrders] = useState([]); // <--- NEW: Orders State
   
   // UI States
   const [searchTerm, setSearchTerm] = useState('');
   const [editingUser, setEditingUser] = useState(null);
   const [file, setFile] = useState(null);
-  const [filterType, setFilterType] = useState('ALL'); // <--- NEW FILTER
+  const [filterType, setFilterType] = useState('ALL');
   
   // Forms
   const [userData, setUserData] = useState({ name: '', email: '', password: '', city: '', phone: '' });
   const [staffData, setStaffData] = useState({ name: '', email: '', password: '', role: 'CREATOR' });
+  const [productData, setProductData] = useState({ name: '', price: '', description: '' });
 
-  // Reporting (Admin View)
+  // Reporting
   const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [recipients, setRecipients] = useState([]);
 
@@ -37,20 +40,25 @@ const Dashboard = () => {
 
   const fetchAllData = async () => {
     try {
-      const [userRes, staffRes, campRes] = await Promise.all([
+      // Added /shop/orders/all to the fetch list
+      const [userRes, staffRes, campRes, prodRes, orderRes] = await Promise.all([
         api.get('/admin/users/all'),
         api.get('/admin/all'),
-        api.get('/campaigns/history')
+        api.get('/campaigns/history'),
+        api.get('/shop/products'),
+        api.get('/shop/orders/all') // <--- NEW Fetch
       ]);
       setUsers(userRes.data);
       setStaff(staffRes.data);
-      const sortedCampaigns = campRes.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      setCampaigns(sortedCampaigns);
+      setCampaigns(campRes.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+      setProducts(prodRes.data);
+      setOrders((orderRes.data || []).sort((a,b) => new Date(b.orderDate) - new Date(a.orderDate)));
     } catch (err) { console.error("Error loading data", err); }
   };
 
   const handleLogout = () => { localStorage.clear(); navigate('/login'); };
 
+  // --- USER HANDLERS ---
   const handleUserSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -76,11 +84,33 @@ const Dashboard = () => {
     try { await api.post('/users/upload-csv', fd, {headers:{'Content-Type':'multipart/form-data'}}); toast.success("Uploaded!"); fetchAllData(); } catch(err){ toast.error("Failed."); }
   };
 
+  // --- STAFF HANDLERS ---
   const handleCreateStaff = async (e) => {
     e.preventDefault();
     try { await api.post('/admin/create-staff', staffData); toast.success("Staff Added!"); fetchAllData(); } catch(err){ toast.error("Failed."); }
   };
 
+  // --- PRODUCT HANDLERS ---
+  const handleAddProduct = async (e) => {
+    e.preventDefault();
+    try { 
+        await api.post('/shop/products', productData); 
+        toast.success("Product Added to Shop!"); 
+        setProductData({ name: '', price: '', description: '' });
+        fetchAllData(); 
+    } catch(err){ toast.error("Failed to add product."); }
+  };
+
+  // --- ORDER HANDLERS (NEW) ---
+  const handleOrderStatus = async (orderId, newStatus) => {
+      try {
+          await api.put(`/shop/orders/${orderId}/status?status=${newStatus}`);
+          toast.success("Order Status Updated!");
+          fetchAllData();
+      } catch(err) { toast.error("Failed to update status"); }
+  };
+
+  // --- REPORTING ---
   const handleViewReport = async (camp) => {
     setSelectedCampaign(camp);
     try { const { data } = await api.get(`/campaigns/${camp.id}/recipients`); setRecipients(data); } catch(err){}
@@ -105,12 +135,19 @@ const Dashboard = () => {
       <ToastContainer position="top-right" autoClose={2000} theme="colored" />
       
       {/* SIDEBAR */}
-      <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col">
+      <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col sticky top-0 h-screen">
         <div className="p-6 border-b border-gray-100">
           <h2 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600">Nykaa Admin</h2>
         </div>
-        <nav className="flex-1 p-4 space-y-2">
-          {[{ id: 'USERS', icon: Users, label: 'Customer Base' }, { id: 'STAFF', icon: Briefcase, label: 'Staff Management' }, { id: 'CAMPAIGNS', icon: Megaphone, label: 'Campaigns' }, { id: 'ANALYTICS', icon: BarChart3, label: 'Analytics' }].map((item) => (
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          {[
+              { id: 'USERS', icon: Users, label: 'Customer Base' }, 
+              { id: 'STAFF', icon: Briefcase, label: 'Staff Management' }, 
+              { id: 'PRODUCTS', icon: ShoppingBag, label: 'Store Manager' }, 
+              { id: 'ORDERS', icon: Package, label: 'Order Management' }, // <--- NEW TAB
+              { id: 'CAMPAIGNS', icon: Megaphone, label: 'Campaigns' }, 
+              { id: 'ANALYTICS', icon: BarChart3, label: 'Analytics' }
+          ].map((item) => (
             <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${activeTab === item.id ? 'bg-pink-50 text-pink-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
               <item.icon className="w-5 h-5" />{item.label}
             </button>
@@ -123,12 +160,14 @@ const Dashboard = () => {
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 p-8 overflow-y-auto">
+      <main className="flex-1 p-8 overflow-y-auto h-screen">
         <header className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">
               {activeTab === 'USERS' && 'Customer Management'}
               {activeTab === 'STAFF' && 'Staff Directory'}
+              {activeTab === 'PRODUCTS' && 'Store Inventory'} 
+              {activeTab === 'ORDERS' && 'Order Management'}
               {activeTab === 'CAMPAIGNS' && 'System Campaigns'}
               {activeTab === 'ANALYTICS' && 'System Analytics'}
             </h1>
@@ -137,6 +176,7 @@ const Dashboard = () => {
           <button onClick={() => navigate('/creator-dashboard')} className="flex items-center gap-2 bg-gradient-to-r from-pink-600 to-purple-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg hover:shadow-xl hover:scale-105 transition"><Plus className="w-5 h-5" /> Launch Campaign</button>
         </header>
 
+        {/* --- USERS TAB --- */}
         {activeTab === 'USERS' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
@@ -182,59 +222,8 @@ const Dashboard = () => {
             </div>
           </div>
         )}
-
-        {activeTab === 'ANALYTICS' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">User Distribution</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={[
-                      { name: 'Customers', value: users.length, color: '#ec4899' },
-                      { name: 'Admins', value: staff.filter(s => s.role === 'ADMIN').length, color: '#8b5cf6' },
-                      { name: 'Creators', value: staff.filter(s => s.role === 'CREATOR').length, color: '#10b981' },
-                      { name: 'Viewers', value: staff.filter(s => s.role === 'VIEWER').length, color: '#3b82f6' }
-                    ]}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {[
-                      { name: 'Customers', value: users.length, color: '#ec4899' },
-                      { name: 'Admins', value: staff.filter(s => s.role === 'ADMIN').length, color: '#8b5cf6' },
-                      { name: 'Creators', value: staff.filter(s => s.role === 'CREATOR').length, color: '#10b981' },
-                      { name: 'Viewers', value: staff.filter(s => s.role === 'VIEWER').length, color: '#3b82f6' }
-                    ].map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">Campaign Types</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={[
-                  { name: 'promotion offers', count: campaigns.filter(c => c.type === 'SMS').length },
-                  { name: 'Newsletters', count: campaigns.filter(c => c.type === 'EMAIL').length },
-                  { name: 'orders', count: campaigns.filter(c => c.type === 'PUSH').length }
-                ]}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#ec4899" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-
+        
+        {/* --- STAFF TAB --- */}
         {activeTab === 'STAFF' && (
            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
@@ -267,11 +256,136 @@ const Dashboard = () => {
            </div>
         )}
 
+        {/* --- PRODUCTS TAB (STORE MANAGER) --- */}
+        {activeTab === 'PRODUCTS' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* ADD PRODUCT FORM */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <ShoppingBag className="w-5 h-5 text-pink-600" /> Add Product
+                    </h3>
+                    <form onSubmit={handleAddProduct} className="space-y-4">
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase">Product Name</label>
+                            <input type="text" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" 
+                                value={productData.name} onChange={e => setProductData({...productData, name: e.target.value})} required/>
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase">Price (₹)</label>
+                            <input type="number" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" 
+                                value={productData.price} onChange={e => setProductData({...productData, price: e.target.value})} required/>
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase">Description</label>
+                            <textarea className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none h-24 resize-none" 
+                                value={productData.description} onChange={e => setProductData({...productData, description: e.target.value})} />
+                        </div>
+                        <button className="w-full bg-pink-600 text-white py-3 rounded-xl font-bold hover:bg-pink-700 transition">Add to Shop</button>
+                    </form>
+                </div>
+
+                {/* PRODUCT LIST */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 lg:col-span-2 overflow-hidden">
+                    <div className="p-4 border-b border-gray-100 bg-gray-50">
+                         <span className="font-bold text-gray-600">Inventory Items: {products.length}</span>
+                    </div>
+                    {products.length === 0 ? (
+                        <div className="p-10 text-center text-gray-400">No products in store. Add one!</div>
+                    ) : (
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-white text-gray-500 border-b">
+                                <tr>
+                                    <th className="p-4">Product Name</th>
+                                    <th className="p-4">Price</th>
+                                    <th className="p-4">Description</th>
+                                    <th className="p-4 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {products.map(p => (
+                                    <tr key={p.id} className="hover:bg-gray-50">
+                                        <td className="p-4 font-bold text-gray-800">{p.name}</td>
+                                        <td className="p-4 font-medium text-pink-600">₹{p.price}</td>
+                                        <td className="p-4 text-gray-500 max-w-xs truncate" title={p.description}>{p.description || '-'}</td>
+                                        <td className="p-4 text-right">
+                                            <button onClick={() => handleDelete('/shop/products', p.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg" title="Delete Product">
+                                                <Trash2 className="w-4 h-4"/>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            </div>
+        )}
+
+        {/* --- ORDERS TAB (NEW) --- */}
+        {activeTab === 'ORDERS' && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                    <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2"><Package className="w-5 h-5 text-pink-600"/> Order Management</h3>
+                    <span className="bg-pink-100 text-pink-700 px-3 py-1 rounded-full text-xs font-bold">{orders.length} Orders Found</span>
+                </div>
+                {orders.length === 0 ? (
+                    <div className="p-20 text-center text-gray-400">No orders placed yet.</div>
+                ) : (
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-white text-gray-500 border-b uppercase text-xs">
+                            <tr>
+                                <th className="p-4">Order ID</th>
+                                <th className="p-4">Customer</th>
+                                <th className="p-4">Product</th>
+                                <th className="p-4">Amount</th>
+                                <th className="p-4">Date</th>
+                                <th className="p-4">Current Status</th>
+                                <th className="p-4 text-right">Update Status</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {orders.map(o => (
+                                <tr key={o.id} className="hover:bg-gray-50">
+                                    <td className="p-4 font-mono text-gray-400">#{o.id}</td>
+                                    <td className="p-4 font-bold text-gray-800">{o.userName}</td>
+                                    <td className="p-4 text-gray-600">{o.productName}</td>
+                                    <td className="p-4 font-medium">₹{o.amount}</td>
+                                    <td className="p-4 text-gray-500 text-xs">{new Date(o.orderDate).toLocaleDateString()}</td>
+                                    <td className="p-4">
+                                        <span className={`px-2 py-1 rounded-md text-xs font-bold ${
+                                            o.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-700' :
+                                            o.status === 'SHIPPED' ? 'bg-yellow-100 text-yellow-700' :
+                                            o.status === 'DELIVERED' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                                        }`}>
+                                            {o.status}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-right">
+                                        <select 
+                                            className="bg-white border border-gray-200 rounded px-3 py-1 text-xs focus:border-pink-500 outline-none cursor-pointer"
+                                            value={o.status}
+                                            onChange={(e) => handleOrderStatus(o.id, e.target.value)}
+                                        >
+                                            <option value="CONFIRMED">CONFIRMED</option>
+                                            <option value="SHIPPED">SHIPPED</option>
+                                            <option value="OUT_FOR_DELIVERY">OUT FOR DELIVERY</option>
+                                            <option value="DELIVERED">DELIVERED</option>
+                                            <option value="CANCELLED">CANCELLED</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+        )}
+
+        {/* --- CAMPAIGNS TAB --- */}
         {activeTab === 'CAMPAIGNS' && (
           <div>
-            {/* NEW FILTER TABS */}
             <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-                {[{id:'ALL',label:'All',icon:Filter},{id:'SMS',label:'promotion offers',icon:Tag},{id:'EMAIL',label:'Newsletters',icon:Mail},{id:'PUSH',label:'orders',icon:ShoppingBag}].map(f => (
+                {[{id:'ALL',label:'All',icon:Filter},{id:'SMS',label:'promotion offers',icon:Tag},{id:'EMAIL',label:'Newsletters',icon:Mail},{id:'PUSH',label:'orders',icon:Package}].map(f => (
                     <button key={f.id} onClick={() => setFilterType(f.id)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition whitespace-nowrap ${filterType === f.id ? 'bg-pink-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-pink-50'}`}>
                         <f.icon className="w-4 h-4"/> {f.label}
                     </button>
@@ -306,6 +420,58 @@ const Dashboard = () => {
           </div>
         )}
 
+        {/* --- ANALYTICS TAB --- */}
+        {activeTab === 'ANALYTICS' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">User Distribution</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'Customers', value: users.length, color: '#ec4899' },
+                      { name: 'Admins', value: staff.filter(s => s.role === 'ADMIN').length, color: '#8b5cf6' },
+                      { name: 'Creators', value: staff.filter(s => s.role === 'CREATOR').length, color: '#10b981' },
+                      { name: 'Viewers', value: staff.filter(s => s.role === 'VIEWER').length, color: '#3b82f6' }
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    dataKey="value"
+                  >
+                    {[
+                      { name: 'Customers', value: users.length, color: '#ec4899' },
+                      { name: 'Admins', value: staff.filter(s => s.role === 'ADMIN').length, color: '#8b5cf6' },
+                      { name: 'Creators', value: staff.filter(s => s.role === 'CREATOR').length, color: '#10b981' },
+                      { name: 'Viewers', value: staff.filter(s => s.role === 'VIEWER').length, color: '#3b82f6' }
+                    ].map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">Campaign Types</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={[
+                  { name: 'Promotions', count: campaigns.filter(c => c.type === 'SMS').length },
+                  { name: 'Newsletters', count: campaigns.filter(c => c.type === 'EMAIL').length },
+                  { name: 'Orders', count: campaigns.filter(c => c.type === 'PUSH').length }
+                ]}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#ec4899" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
       </main>
 
       {/* MODAL */}
@@ -333,8 +499,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-
-
-
-
-
