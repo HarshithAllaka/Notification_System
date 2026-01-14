@@ -5,8 +5,8 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { 
   PenTool, Users, LogOut, Send, LayoutDashboard, 
-  MapPin, MessageSquare, Plus, Edit2, FileText, Download,
-  Tag, Mail, Filter, User, BarChart3, Trash2
+  MapPin, Plus, Edit2, FileText, Download,
+  Tag, Mail, Filter, User, BarChart3, Trash2, CalendarClock
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -14,10 +14,10 @@ const CreatorDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('CAMPAIGNS');
 
-  // Campaign State
+  // Campaign State - Added scheduledAt
   const [campaigns, setCampaigns] = useState([]);
   const [campaignData, setCampaignData] = useState({ 
-    name: '', type: 'Promotion Offers', content: '', schedule: '', targetCities: [], channels: ['EMAIL', 'SMS', 'PUSH']
+    name: '', type: 'Promotion Offers', content: '', schedule: '', targetCities: [], channels: ['EMAIL', 'SMS', 'PUSH'], scheduledAt: ''
   });
   
   // User State
@@ -65,15 +65,24 @@ const CreatorDashboard = () => {
   // --- LOGIC ---
   const handleCampaignSubmit = async (e) => {
     e.preventDefault();
+    
+    // Format payload for Java LocalDateTime (append :00 for seconds)
+    const payload = {
+        ...campaignData,
+        scheduledAt: campaignData.scheduledAt ? campaignData.scheduledAt + ':00' : null
+    };
+
     try {
       if (editingCampaign) {
-        await api.put(`/campaigns/${editingCampaign}`, campaignData);
+        await api.put(`/campaigns/${editingCampaign}`, payload);
         toast.success("Campaign Updated!");
       } else {
-        await api.post('/campaigns/create', campaignData);
-        toast.success("Campaign Created!");
+        await api.post('/campaigns/create', payload);
+        if(payload.scheduledAt) toast.info("Campaign Scheduled Successfully!");
+        else toast.success("Campaign Launched!");
       }
-      setCampaignData({ name: '', type: 'Promotion Offers', content: '', schedule: '', targetCities: [], channels: ['EMAIL', 'SMS', 'PUSH'] });
+      
+      setCampaignData({ name: '', type: 'Promotion Offers', content: '', schedule: '', targetCities: [], channels: ['EMAIL', 'SMS', 'PUSH'], scheduledAt: '' });
       setEditingCampaign(null);
       fetchData();
     } catch (err) { toast.error("Operation failed."); }
@@ -85,7 +94,13 @@ const CreatorDashboard = () => {
       ? c.targetCities 
       : (c.targetCity ? [c.targetCity] : []);
     setCampaignData({ 
-        name: c.campaignName, type: c.type, content: c.content, schedule: '', targetCities: cities, channels: ['EMAIL'] 
+        name: c.campaignName, 
+        type: c.type, 
+        content: c.content, 
+        schedule: '', 
+        targetCities: cities, 
+        channels: ['EMAIL', 'SMS', 'PUSH'],
+        scheduledAt: '' // Reset schedule on edit
     });
     setActiveTab('CAMPAIGNS'); window.scrollTo(0,0);
   };
@@ -154,7 +169,6 @@ const CreatorDashboard = () => {
     return campaigns.filter(c => c.type === filterType);
   };
 
-  // Removed "Orders" from filters since creators don't manage them here
   const filters = [
       { id: 'ALL', label: 'All', icon: Filter },
       { id: 'Promotion Offers', label: 'Promotions', icon: Tag },
@@ -205,7 +219,6 @@ const CreatorDashboard = () => {
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
               <h3 className="text-lg font-bold text-gray-800 mb-4">Campaign Types Distribution</h3>
               <ResponsiveContainer width="100%" height={300}>
-                {/* Removed Orders from this chart */}
                 <BarChart data={[
                   { name: 'Promotions', count: campaigns.filter(c => c.type === 'Promotion Offers' || c.type === 'SMS').length },
                   { name: 'Newsletters', count: campaigns.filter(c => c.type === 'Newsletters' || c.type === 'EMAIL').length },
@@ -237,7 +250,6 @@ const CreatorDashboard = () => {
                     <select className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" value={campaignData.type} onChange={(e) => setCampaignData({...campaignData, type: e.target.value})}>
                       <option value="Promotion Offers">Promotional Offer</option>
                       <option value="Newsletters">Newsletter</option>
-                      {/* ORDER UPDATE OPTION REMOVED */}
                     </select>
                   </div>
                   <div>
@@ -294,15 +306,32 @@ const CreatorDashboard = () => {
                    <label className="text-xs font-bold text-gray-500 uppercase">Message Content</label>
                    <textarea rows="4" placeholder="Type your message..." className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none focus:ring-2 focus:ring-purple-500 transition" value={campaignData.content} onChange={(e) => setCampaignData({...campaignData, content: e.target.value})} required />
                 </div>
+
+                {/* --- NEW SCHEDULE INPUT --- */}
+                <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1">
+                        <CalendarClock className="w-3 h-3"/> Schedule (Optional)
+                    </label>
+                    <input 
+                        type="datetime-local" 
+                        className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none text-sm text-gray-600"
+                        value={campaignData.scheduledAt} 
+                        onChange={(e) => setCampaignData({...campaignData, scheduledAt: e.target.value})} 
+                    />
+                    <span className="text-[10px] text-gray-400">Leave blank to launch immediately.</span>
+                </div>
+
                 <button className="w-full bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700 transition flex justify-center items-center gap-2">
-                   {editingCampaign ? <><Edit2 className="w-4 h-4"/> Update Campaign</> : <><Send className="w-4 h-4"/> Launch Now</>}
+                   {editingCampaign ? <><Edit2 className="w-4 h-4"/> Update Campaign</> : (
+                       campaignData.scheduledAt ? <><CalendarClock className="w-4 h-4"/> Schedule Campaign</> : <><Send className="w-4 h-4"/> Launch Now</>
+                   )}
                 </button>
               </form>
             </div>
 
             {/* List */}
             <div className="lg:col-span-2">
-               {/* NEW FILTER TABS - Removed Orders */}
+               {/* NEW FILTER TABS */}
                <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
                   {filters.map(f => (
                       <button key={f.id} onClick={() => setFilterType(f.id)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition whitespace-nowrap ${filterType === f.id ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-purple-50'}`}>
@@ -315,7 +344,7 @@ const CreatorDashboard = () => {
                  <div className="p-4 border-b border-gray-100 bg-gray-50 font-bold text-gray-700">Recent Campaigns</div>
                  <div className="overflow-x-auto">
                    <table className="w-full text-sm text-left">
-                     <thead className="text-gray-500 border-b"><tr><th className="p-4">Campaign Details</th><th className="p-4">Target</th><th className="p-4 text-right">Actions</th></tr></thead>
+                     <thead className="text-gray-50 border-b"><tr><th className="p-4">Campaign Details</th><th className="p-4">Target</th><th className="p-4 text-right">Actions</th></tr></thead>
                      <tbody className="divide-y divide-gray-100">
                        {getFilteredCampaigns().map((c, i) => (
                          <tr key={i} className="hover:bg-gray-50 transition">

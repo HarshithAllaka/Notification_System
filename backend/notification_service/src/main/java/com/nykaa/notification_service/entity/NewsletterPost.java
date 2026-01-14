@@ -16,10 +16,16 @@ public class NewsletterPost {
     @JoinColumn(name = "newsletter_id")
     private Newsletter newsletter;
 
-    private String title;   // e.g., "Winter Collection is Here!"
+    private String title;   
     @Column(columnDefinition = "TEXT")
-    private String content; // The actual body text
+    private String content; 
 
     private LocalDateTime sentAt = LocalDateTime.now();
-    private int recipientsCount; // For analytics
+    private int recipientsCount; 
+
+    // --- NEW FIELDS FOR SCHEDULING ---
+    private LocalDateTime scheduledAt;
+    
+    // Status: "SENT", "SCHEDULED"
+    private String status = "SENT"; 
 }

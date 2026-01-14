@@ -21,37 +21,57 @@ public class CampaignService {
     private final PreferenceRepository preferenceRepository;
     private final NotificationLogRepository logRepository;
 
+    // --- NEW: Schedule Logic ---
+    public void scheduleCampaign(CampaignRequest request) {
+        Campaign campaign = new Campaign();
+        campaign.setCampaignName(request.getName());
+        campaign.setType(request.getType());
+        campaign.setContent(request.getContent());
+        campaign.setTargetCities(request.getTargetCities());
+        
+        // --- SAVE THE CHANNELS ---
+        campaign.setChannels(request.getChannels()); 
+        
+        campaign.setCreatedAt(LocalDateTime.now());
+        campaign.setScheduledAt(request.getScheduledAt());
+        campaign.setStatus("SCHEDULED");
+        
+        campaignRepository.save(campaign);
+        System.out.println("Campaign '" + request.getName() + "' scheduled for " + request.getScheduledAt());
+    }
+
+    // --- Existing: Immediate Execution ---
     public void executeCampaign(CampaignRequest request) {
         System.out.println("Executing campaign with target cities: " + request.getTargetCities());
         Campaign campaign = new Campaign();
         campaign.setCampaignName(request.getName());
         campaign.setType(request.getType());
         campaign.setContent(request.getContent());
-        campaign.setTargetCities(request.getTargetCities()); // Save target cities
+        campaign.setTargetCities(request.getTargetCities()); 
         campaign.setCreatedAt(LocalDateTime.now());
+        
+        // Mark immediate campaigns as SENT
+        campaign.setStatus("SENT");
+        
         campaignRepository.save(campaign);
 
         List<User> users = userRepository.findAll();
         for (User user : users) {
             if (!user.isActive()) continue;
 
-            // --- CITY FILTER LOGIC FOR MULTIPLE CITIES ---
-            // Check targetCities (new format)
+            // --- CITY FILTER LOGIC ---
             if (request.getTargetCities() != null && !request.getTargetCities().isEmpty()) {
-                // If "All Cities" is selected, skip the city filter
                 if (!request.getTargetCities().contains("All Cities")) {
-                    // Check if user's city is in the target cities list
                     if (user.getCity() == null || 
                         !request.getTargetCities().stream()
                             .anyMatch(city -> city.equalsIgnoreCase(user.getCity()))) {
-                        System.out.println("Skipping user " + user.getUserId() + " in city " + user.getCity() + " for target cities " + request.getTargetCities());
-                        continue; // Skip this user if their city is not in target list
+                        continue; 
                     }
                 }
             } else {
                 System.out.println("No target cities specified, sending to all");
             }
-            // -----------------------------------------------
+            // -------------------------
 
             Preference pref = preferenceRepository.findByUserUserId(user.getUserId());
             if (pref == null) continue;
@@ -83,12 +103,13 @@ public class CampaignService {
                 log.setStatus("SENT");
                 log.setChannel(channel);
                 log.setSentAt(LocalDateTime.now());
+                log.setMessage(campaign.getCampaignName()); // Ensure message content is saved
+                log.setContent(campaign.getContent());
                 logRepository.save(log);
             }
         }
     }
 
-    // ... (Keep existing getAllCampaigns, getRecipients, deleteCampaign methods exactly as they were) ...
     public List<Campaign> getAllCampaigns() { return campaignRepository.findAll(); }
 
     public List<RecipientDto> getCampaignRecipients(Long campaignId) {
@@ -109,7 +130,6 @@ public class CampaignService {
         campaignRepository.deleteById(id);
     }
 
-    // Update Campaign with multiple cities support
     public Campaign updateCampaign(Long id, CampaignRequest request) {
         Campaign existing = campaignRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Campaign not found"));
@@ -117,7 +137,7 @@ public class CampaignService {
         existing.setCampaignName(request.getName());
         existing.setType(request.getType());
         existing.setContent(request.getContent());
-        existing.setTargetCities(request.getTargetCities()); // Update target cities
+        existing.setTargetCities(request.getTargetCities());
         
         return campaignRepository.save(existing);
     }

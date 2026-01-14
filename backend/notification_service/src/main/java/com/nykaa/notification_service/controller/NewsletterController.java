@@ -21,6 +21,7 @@ public class NewsletterController {
     private final NewsletterPostRepository postRepository;
     private final UserRepository userRepository;
     private final NotificationLogRepository logRepository;
+    private final PreferenceRepository preferenceRepository; 
 
     // --- 1. ADMIN/CREATOR: Manage Newsletters ---
 
@@ -49,7 +50,7 @@ public class NewsletterController {
     }
 
     @PostMapping("/{id}/subscribe")
-    public ResponseEntity<?> subscribe(@PathVariable Long id, @RequestBody NewsletterSubscription pref) {
+    public ResponseEntity<?> subscribe(@PathVariable Long id) {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found"));
         Newsletter newsletter = newsletterRepository.findById(id).orElseThrow(() -> new RuntimeException("Newsletter not found"));
@@ -63,53 +64,85 @@ public class NewsletterController {
         NewsletterSubscription sub = new NewsletterSubscription();
         sub.setUserId(user.getUserId());
         sub.setNewsletter(newsletter);
-        sub.setReceiveEmail(pref.isReceiveEmail());
-        sub.setReceiveSms(pref.isReceiveSms());
-        sub.setReceivePush(pref.isReceivePush());
+        // Default flags (actual delivery logic is handled by Global Preferences now)
+        sub.setReceiveEmail(true);
+        sub.setReceiveSms(true);
+        sub.setReceivePush(true);
         
         subscriptionRepository.save(sub);
         return ResponseEntity.ok("Subscribed successfully");
     }
 
-    @PutMapping("/subscription/{subId}")
-    public ResponseEntity<?> updateSubscription(@PathVariable Long subId, @RequestBody NewsletterSubscription updates) {
-        NewsletterSubscription sub = subscriptionRepository.findById(subId).orElseThrow(() -> new RuntimeException("Subscription not found"));
-        sub.setReceiveEmail(updates.isReceiveEmail());
-        sub.setReceiveSms(updates.isReceiveSms());
-        sub.setReceivePush(updates.isReceivePush());
-        subscriptionRepository.save(sub);
-        return ResponseEntity.ok("Preferences updated");
+    @DeleteMapping("/{id}/unsubscribe")
+    public ResponseEntity<?> unsubscribe(@PathVariable Long id) {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found"));
+        
+        Optional<NewsletterSubscription> existing = subscriptionRepository.findByUserIdAndNewsletterId(user.getUserId(), id);
+        if (existing.isPresent()) {
+            subscriptionRepository.delete(existing.get());
+            return ResponseEntity.ok("Unsubscribed successfully");
+        }
+        return ResponseEntity.badRequest().body("Subscription not found");
     }
 
-    // --- 3. CREATOR: Publish a Post ---
+    // --- 3. CREATOR: Publish a Post (Updated for Scheduling) ---
 
     @PostMapping("/{id}/publish")
     public ResponseEntity<?> publishPost(@PathVariable Long id, @RequestBody NewsletterPost post) {
         Newsletter newsletter = newsletterRepository.findById(id).orElseThrow(() -> new RuntimeException("Newsletter not found"));
         
-        // 1. Save the Post first to generate an ID
         post.setNewsletter(newsletter);
-        post.setSentAt(LocalDateTime.now());
-        NewsletterPost savedPost = postRepository.save(post);
-
-        // 2. Send to Subscribers
-        List<NewsletterSubscription> subscribers = subscriptionRepository.findByNewsletterId(id);
-        int count = 0;
-
-        for (NewsletterSubscription sub : subscribers) {
-            boolean sent = false;
-            // Check granular preferences for this specific newsletter
-            if (sub.isReceiveEmail()) { createLog(sub.getUserId(), "EMAIL", savedPost); sent = true; }
-            if (sub.isReceiveSms())   { createLog(sub.getUserId(), "SMS", savedPost); sent = true; }
-            if (sub.isReceivePush())  { createLog(sub.getUserId(), "PUSH", savedPost); sent = true; }
-            
-            if (sent) count++;
-        }
         
-        savedPost.setRecipientsCount(count);
-        postRepository.save(savedPost);
+        // --- NEW SCHEDULING LOGIC ---
+        if (post.getScheduledAt() != null) {
+            // Case 1: Scheduled Future Post
+            post.setStatus("SCHEDULED");
+            // NOTE: We do NOT set sentAt yet. The Scheduler will set it when it runs.
+            postRepository.save(post);
+            return ResponseEntity.ok("Post scheduled for " + post.getScheduledAt());
+        } 
+        else {
+            // Case 2: Immediate Publish (Standard Logic)
+            post.setStatus("SENT");
+            post.setSentAt(LocalDateTime.now());
+            NewsletterPost savedPost = postRepository.save(post);
 
-        return ResponseEntity.ok("Published to " + count + " subscribers.");
+            // Send to Subscribers based on GLOBAL PREFERENCES
+            List<NewsletterSubscription> subscribers = subscriptionRepository.findByNewsletterId(id);
+            int count = 0;
+
+            for (NewsletterSubscription sub : subscribers) {
+                String userId = sub.getUserId();
+                
+                // FETCH GLOBAL PREFERENCES
+                Preference globalPref = preferenceRepository.findByUserUserId(userId);
+                
+                if (globalPref != null) {
+                    boolean sent = false;
+                    // Logic: Check Global Preference -> Send Notification
+                    if (globalPref.isEmailNewsletters()) { 
+                        createLog(userId, "EMAIL", savedPost); 
+                        sent = true; 
+                    }
+                    if (globalPref.isSmsNewsletters()) { 
+                        createLog(userId, "SMS", savedPost); 
+                        sent = true; 
+                    }
+                    if (globalPref.isPushNewsletters()) { 
+                        createLog(userId, "PUSH", savedPost); 
+                        sent = true; 
+                    }
+                    
+                    if (sent) count++;
+                }
+            }
+            
+            savedPost.setRecipientsCount(count);
+            postRepository.save(savedPost);
+
+            return ResponseEntity.ok("Published immediately to " + count + " subscribers.");
+        }
     }
 
     private void createLog(String userId, String channel, NewsletterPost post) {
@@ -119,11 +152,8 @@ public class NewsletterController {
         log.setStatus("SENT");
         log.setSentAt(LocalDateTime.now());
         
-        // -1 Flag tells Frontend this is a Newsletter
         log.setCampaignId(-1L); 
-        // We link to the post ID for tracking
         log.setNewsletterPostId(post.getId());
-        
         log.setMessage(post.getTitle());
         log.setContent(post.getContent());
         

@@ -18,8 +18,14 @@ public class CampaignController {
 
     @PostMapping("/create")
     public ResponseEntity<String> createCampaign(@RequestBody CampaignRequest request) {
-        campaignService.executeCampaign(request);
-        return ResponseEntity.ok("Campaign launched successfully!");
+        // Check if scheduling is requested
+        if (request.getScheduledAt() != null) {
+            campaignService.scheduleCampaign(request);
+            return ResponseEntity.ok("Campaign scheduled successfully!");
+        } else {
+            campaignService.executeCampaign(request);
+            return ResponseEntity.ok("Campaign launched immediately!");
+        }
     }
 
     @GetMapping("/history")
@@ -38,7 +44,6 @@ public class CampaignController {
         return ResponseEntity.ok("Campaign deleted");
     }
 
-    // --- NEW UPDATE ENDPOINT ---
     @PutMapping("/{id}")
     public ResponseEntity<Campaign> updateCampaign(@PathVariable Long id, @RequestBody CampaignRequest request) {
         return ResponseEntity.ok(campaignService.updateCampaign(id, request));

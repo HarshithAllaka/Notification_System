@@ -14,7 +14,7 @@ public class Campaign {
     private Long id;
 
     private String campaignName;
-    private String type; 
+    private String type; // e.g. "Promotion Offers"
     
     @Column(length = 1000)
     private String content;
@@ -22,10 +22,16 @@ public class Campaign {
     @ElementCollection
     @CollectionTable(name = "campaign_target_cities", joinColumns = @JoinColumn(name = "campaign_id"))
     @Column(name = "city")
-    private List<String> targetCities; // Support multiple cities
+    private List<String> targetCities; 
     
-    // Keep this for backward compatibility
-    private String targetCity;
-    
+    // --- NEW FIELD: STORE SELECTED CHANNELS ---
+    @ElementCollection
+    @CollectionTable(name = "campaign_channels", joinColumns = @JoinColumn(name = "campaign_id"))
+    @Column(name = "channel")
+    private List<String> channels; 
+
+    private String targetCity; 
     private LocalDateTime createdAt;
+    private LocalDateTime scheduledAt;
+    private String status = "SENT"; 
 }

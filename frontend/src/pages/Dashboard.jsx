@@ -7,7 +7,7 @@ import {
   Users, Briefcase, Megaphone, LogOut, UploadCloud, 
   Plus, Trash2, Edit2, Shield, Search, Power,
   Filter, Tag, Mail, ShoppingBag, User, BarChart3, Package,
-  Newspaper, Send
+  Newspaper, Send, CalendarClock
 } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -21,7 +21,7 @@ const Dashboard = () => {
   const [campaigns, setCampaigns] = useState([]);
   const [products, setProducts] = useState([]); 
   const [orders, setOrders] = useState([]); 
-  const [newsletters, setNewsletters] = useState([]); // <--- NEW
+  const [newsletters, setNewsletters] = useState([]); 
   
   // UI States
   const [searchTerm, setSearchTerm] = useState('');
@@ -34,10 +34,11 @@ const Dashboard = () => {
   const [staffData, setStaffData] = useState({ name: '', email: '', password: '', role: 'CREATOR' });
   const [productData, setProductData] = useState({ name: '', price: '', description: '' });
   
-  // Newsletter Forms (NEW)
+  // Newsletter Forms
   const [newsletterData, setNewsletterData] = useState({ title: '', description: '' });
-  const [postData, setPostData] = useState({ title: '', content: '' });
-  const [selectedNewsletterId, setSelectedNewsletterId] = useState(null); // For publishing
+  // Updated state to include scheduledAt
+  const [postData, setPostData] = useState({ title: '', content: '', scheduledAt: '' }); 
+  const [selectedNewsletterId, setSelectedNewsletterId] = useState(null); 
 
   // Reporting
   const [selectedCampaign, setSelectedCampaign] = useState(null);
@@ -53,14 +54,14 @@ const Dashboard = () => {
         api.get('/campaigns/history'),
         api.get('/shop/products'),
         api.get('/shop/orders/all'),
-        api.get('/newsletters/all') // <--- NEW Fetch
+        api.get('/newsletters/all')
       ]);
       setUsers(userRes.data);
       setStaff(staffRes.data);
       setCampaigns(campRes.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
       setProducts(prodRes.data);
       setOrders((orderRes.data || []).sort((a,b) => new Date(b.orderDate) - new Date(a.orderDate)));
-      setNewsletters(newsRes.data || []); // <--- Set Newsletters
+      setNewsletters(newsRes.data || []);
     } catch (err) { console.error("Error loading data", err); }
   };
 
@@ -118,7 +119,7 @@ const Dashboard = () => {
       } catch(err) { toast.error("Failed to update status"); }
   };
 
-  // --- NEWSLETTER HANDLERS (NEW) ---
+  // --- NEWSLETTER HANDLERS ---
   const handleCreateNewsletter = async (e) => {
       e.preventDefault();
       try {
@@ -132,10 +133,23 @@ const Dashboard = () => {
   const handlePublishPost = async (e) => {
       e.preventDefault();
       if(!selectedNewsletterId) return toast.error("Select a newsletter first!");
+      
+      // Format payload: If scheduledAt exists, ensure it has seconds for Java LocalDateTime
+      const payload = {
+          ...postData,
+          scheduledAt: postData.scheduledAt ? postData.scheduledAt + ':00' : null 
+      };
+
       try {
-          await api.post(`/newsletters/${selectedNewsletterId}/publish`, postData);
-          toast.success("Post Published to Subscribers!");
-          setPostData({ title: '', content: '' });
+          await api.post(`/newsletters/${selectedNewsletterId}/publish`, payload);
+          
+          if(payload.scheduledAt) {
+              toast.info("Post Scheduled Successfully!");
+          } else {
+              toast.success("Post Published to Subscribers!");
+          }
+          
+          setPostData({ title: '', content: '', scheduledAt: '' });
           setSelectedNewsletterId(null);
       } catch(err) { toast.error("Publishing failed."); }
   };
@@ -175,7 +189,7 @@ const Dashboard = () => {
               { id: 'STAFF', icon: Briefcase, label: 'Staff Management' }, 
               { id: 'PRODUCTS', icon: ShoppingBag, label: 'Store Manager' }, 
               { id: 'ORDERS', icon: Package, label: 'Order Management' }, 
-              { id: 'NEWSLETTERS', icon: Newspaper, label: 'Newsletters' }, // <--- NEW TAB
+              { id: 'NEWSLETTERS', icon: Newspaper, label: 'Newsletters' }, 
               { id: 'CAMPAIGNS', icon: Megaphone, label: 'Campaigns' }, 
               { id: 'ANALYTICS', icon: BarChart3, label: 'Analytics' }
           ].map((item) => (
@@ -435,7 +449,7 @@ const Dashboard = () => {
                     </form>
                 </div>
 
-                {/* 2. Publish Post */}
+                {/* 2. Publish Post - UPDATED WITH SCHEDULING */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
                     <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                         <Send className="w-5 h-5 text-blue-600"/> Publish Issue
@@ -450,7 +464,24 @@ const Dashboard = () => {
                             value={postData.title} onChange={e => setPostData({...postData, title: e.target.value})} required />
                         <textarea placeholder="Write your content here..." className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none h-32 resize-none"
                             value={postData.content} onChange={e => setPostData({...postData, content: e.target.value})} required />
-                        <button className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition">Publish & Notify Subscribers</button>
+                        
+                        {/* --- NEW SCHEDULE INPUT --- */}
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1">
+                                <CalendarClock className="w-3 h-3"/> Schedule (Optional)
+                            </label>
+                            <input 
+                                type="datetime-local" 
+                                className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none text-sm text-gray-600"
+                                value={postData.scheduledAt} 
+                                onChange={e => setPostData({...postData, scheduledAt: e.target.value})} 
+                            />
+                            <span className="text-[10px] text-gray-400">Leave blank to publish immediately.</span>
+                        </div>
+
+                        <button className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition">
+                            {postData.scheduledAt ? 'Schedule Publication' : 'Publish Now'}
+                        </button>
                     </form>
                 </div>
 
