@@ -159,4 +159,20 @@ public class NewsletterController {
         
         logRepository.save(log);
     }
+
+    // --- 4. VIEW & MANAGE POSTS (New) ---
+
+    @GetMapping("/{id}/posts")
+    public ResponseEntity<List<NewsletterPost>> getPosts(@PathVariable Long id) {
+        return ResponseEntity.ok(postRepository.findByNewsletterId(id));
+    }
+
+    @DeleteMapping("/posts/{postId}")
+    public ResponseEntity<?> deletePost(@PathVariable Long postId) {
+        if (!postRepository.existsById(postId)) {
+            return ResponseEntity.badRequest().body("Post not found");
+        }
+        postRepository.deleteById(postId);
+        return ResponseEntity.ok("Post deleted successfully");
+    }
 }

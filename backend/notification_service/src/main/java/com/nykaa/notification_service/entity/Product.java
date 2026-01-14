@@ -13,6 +13,6 @@ public class Product {
 
     private String name;
     private Double price;
-    private String imageUrl; // We will use placeholder URLs
+    private String imageUrl; // URL of the product image
     private String description;
 }

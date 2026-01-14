@@ -294,7 +294,11 @@ const UserHome = () => {
                 {products.map(p => (
                   <div key={p.id} className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex flex-col hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 group">
                     <div className="h-48 bg-gray-50 rounded-2xl mb-5 flex items-center justify-center text-gray-300 group-hover:bg-nykaa-50 transition-colors relative overflow-hidden">
-                      <ShoppingBag size={56} className="text-gray-200 group-hover:text-nykaa-200 transition-colors" />
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <ShoppingBag size={56} className="text-gray-200 group-hover:text-nykaa-200 transition-colors" />
+                      )}
                       <div className="absolute top-4 right-4 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-gray-900 shadow-sm">New Arrival</div>
                     </div>
                     <h3 className="font-bold text-xl text-gray-900 mb-1">{p.name}</h3>

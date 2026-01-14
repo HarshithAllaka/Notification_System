@@ -7,7 +7,8 @@ import {
   Users, Briefcase, Megaphone, LogOut, UploadCloud,
   Plus, Trash2, Edit2, Shield, Search, Power,
   Filter, Tag, Mail, ShoppingBag, User, BarChart3, Package,
-  Newspaper, Send, CalendarClock, Sparkles, LayoutDashboard
+  Newspaper, Send, CalendarClock, Sparkles, LayoutDashboard,
+  CheckCircle2, MapPin
 } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -32,7 +33,7 @@ const Dashboard = () => {
   // Forms
   const [userData, setUserData] = useState({ name: '', email: '', password: '', city: '', phone: '' });
   const [staffData, setStaffData] = useState({ name: '', email: '', password: '', role: 'CREATOR' });
-  const [productData, setProductData] = useState({ name: '', price: '', description: '' });
+  const [productData, setProductData] = useState({ name: '', price: '', description: '', imageUrl: '' });
 
   // Newsletter Forms
   const [newsletterData, setNewsletterData] = useState({ title: '', description: '' });
@@ -40,6 +41,32 @@ const Dashboard = () => {
   const [selectedNewsletterId, setSelectedNewsletterId] = useState(null);
   const [recipients, setRecipients] = useState([]);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
+
+  // Campaign State (Restored)
+  const [campaignData, setCampaignData] = useState({ name: '', type: 'Promotion Offers', content: '', schedule: '', targetCities: [], channels: ['EMAIL', 'SMS', 'PUSH'], scheduledAt: '' });
+  const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
+
+  // Newsletter View State
+  const [viewingNewsletter, setViewingNewsletter] = useState(null);
+  const [newsletterPosts, setNewsletterPosts] = useState([]);
+
+  // --- HANDLERS ---
+  const handleViewPosts = async (newsletter) => {
+    setViewingNewsletter(newsletter);
+    try {
+      const { data } = await api.get(`/newsletters/${newsletter.id}/posts`);
+      setNewsletterPosts(data.sort((a, b) => new Date(b.sentAt || b.createdAt) - new Date(a.sentAt || a.createdAt)));
+    } catch (err) { toast.error("Failed to load issues"); }
+  };
+
+  const handleDeletePost = async (postId) => {
+    if (!window.confirm("Delete this issue?")) return;
+    try {
+      await api.delete(`/newsletters/posts/${postId}`);
+      toast.success("Issue deleted");
+      setNewsletterPosts(newsletterPosts.filter(p => p.id !== postId));
+    } catch (err) { toast.error("Failed"); }
+  };
 
   useEffect(() => { fetchAllData(); }, []);
 
@@ -142,14 +169,60 @@ const Dashboard = () => {
     } catch (err) { toast.error("Publishing failed."); }
   };
 
+  // --- CAMPAIGN HANDLERS (Missing Fix) ---
+  const handleCampaignSubmit = async (e) => {
+    e.preventDefault();
+    const payload = { ...campaignData, scheduledAt: campaignData.scheduledAt ? campaignData.scheduledAt + ':00' : null };
+    try {
+      await api.post('/campaigns/create', payload);
+      toast.success("Promotion Launched!");
+      setCampaignData({ name: '', type: 'Promotion Offers', content: '', schedule: '', targetCities: [], channels: ['EMAIL', 'SMS', 'PUSH'], scheduledAt: '' });
+      fetchAllData();
+    } catch (err) { toast.error("Operation failed."); }
+  };
+
+  const handleCityToggle = (city) => {
+    if (city === 'All Cities') {
+      if (campaignData.targetCities.includes('All Cities')) {
+        setCampaignData({ ...campaignData, targetCities: [] });
+      } else {
+        setCampaignData({ ...campaignData, targetCities: ['All Cities'] });
+      }
+    } else {
+      let newCities = campaignData.targetCities.filter(c => c !== 'All Cities');
+      if (newCities.includes(city)) {
+        newCities = newCities.filter(c => c !== city);
+      } else {
+        newCities.push(city);
+      }
+      setCampaignData({ ...campaignData, targetCities: newCities });
+    }
+  };
+
   const handleViewReport = async (camp) => {
     setSelectedCampaign(camp);
-    try { const { data } = await api.get(`/campaigns/${camp.id}/recipients`); setRecipients(data); } catch (err) { }
+    try {
+      const { data } = await api.get(`/campaigns/${camp.id}/recipients`);
+
+      // Group by Email
+      const groupedMap = new Map();
+      (data || []).forEach(r => {
+        if (!groupedMap.has(r.email)) {
+          groupedMap.set(r.email, { ...r, channels: r.channel ? [r.channel] : [] });
+        } else {
+          const existing = groupedMap.get(r.email);
+          if (r.channel && !existing.channels.includes(r.channel)) {
+            existing.channels.push(r.channel);
+          }
+        }
+      });
+      setRecipients(Array.from(groupedMap.values()));
+    } catch (err) { }
   };
 
   const downloadCSV = () => {
-    const headers = "Name,Email,Status,Sent At\n";
-    const rows = recipients.map(r => `${r.name},${r.email},${r.status},${r.sentAt}`).join("\n");
+    const headers = "Name,Email,Status,Channels,Sent At\n";
+    const rows = recipients.map(r => `${r.name},${r.email},${r.status},"${r.channels.join('|')}",${r.sentAt}`).join("\n");
     const blob = new Blob([headers + rows], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `Report.csv`; a.click();
@@ -165,8 +238,8 @@ const Dashboard = () => {
     <button
       onClick={() => setActiveTab(id)}
       className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 font-bold text-sm ${activeTab === id
-          ? 'bg-gradient-to-r from-nykaa-600 to-brand-purple text-white shadow-lg shadow-nykaa-500/30 ring-2 ring-white/20'
-          : 'text-gray-500 hover:bg-white hover:shadow-sm hover:text-nykaa-600'
+        ? 'bg-gradient-to-r from-nykaa-600 to-brand-purple text-white shadow-lg shadow-nykaa-500/30 ring-2 ring-white/20'
+        : 'text-gray-500 hover:bg-white hover:shadow-sm hover:text-nykaa-600'
         }`}
     >
       <Icon className={`w-5 h-5 ${activeTab === id ? 'text-white' : 'text-gray-400 group-hover:text-nykaa-500'}`} />
@@ -198,7 +271,7 @@ const Dashboard = () => {
 
           <div className="text-xs font-bold text-gray-400 tracking-wider uppercase mt-6 mb-2 ml-4">Communication</div>
           <TabButton id="NEWSLETTERS" icon={Newspaper} label="Newsletters" />
-          <TabButton id="CAMPAIGNS" icon={Megaphone} label="Campaigns" />
+          <TabButton id="PROMOTIONS" icon={Megaphone} label="Promotional Offers" />
         </nav>
 
         <div className="p-4 border-t border-gray-200/50 m-2 bg-white/50 rounded-3xl backdrop-blur-sm">
@@ -223,16 +296,14 @@ const Dashboard = () => {
               {activeTab === 'PRODUCTS' && 'Store Inventory'}
               {activeTab === 'ORDERS' && 'Order Management'}
               {activeTab === 'NEWSLETTERS' && 'Newsletter Publishing'}
-              {activeTab === 'CAMPAIGNS' && 'System Campaigns'}
+              {activeTab === 'PROMOTIONS' && 'Promotional Offers'}
             </h1>
             <p className="text-gray-500 font-medium mt-2">Manage your platform efficiently.</p>
           </div>
 
-          {activeTab !== 'NEWSLETTERS' && activeTab !== 'ANALYTICS' && (
-            <button onClick={() => navigate('/creator-dashboard')} className="flex items-center gap-2 bg-gradient-to-r from-nykaa-600 to-brand-purple text-white px-6 py-3 rounded-2xl font-bold shadow-xl shadow-nykaa-500/20 hover:shadow-2xl hover:scale-105 transition-all duration-300">
-              <Sparkles className="w-5 h-5" /> Go to Creator Studio
-            </button>
-          )}
+
+          {/* Creator Studio Link Removed as per user request */}
+
         </header>
 
         {/* --- USERS TAB --- */}
@@ -371,6 +442,7 @@ const Dashboard = () => {
               <form onSubmit={handleAddProduct} className="space-y-4">
                 <input type="text" placeholder="Product Name" className="w-full bg-gray-50 rounded-xl p-4 font-medium" value={productData.name} onChange={e => setProductData({ ...productData, name: e.target.value })} required />
                 <input type="number" placeholder="Price (₹)" className="w-full bg-gray-50 rounded-xl p-4 font-medium" value={productData.price} onChange={e => setProductData({ ...productData, price: e.target.value })} required />
+                <input type="text" placeholder="Image URL (Optional)" className="w-full bg-gray-50 rounded-xl p-4 font-medium" value={productData.imageUrl || ''} onChange={e => setProductData({ ...productData, imageUrl: e.target.value })} />
                 <textarea placeholder="Description" className="w-full bg-gray-50 rounded-xl p-4 font-medium h-32 resize-none" value={productData.description} onChange={e => setProductData({ ...productData, description: e.target.value })} />
                 <button className="w-full bg-nykaa-500 text-white py-4 rounded-xl font-bold hover:bg-nykaa-600 transition shadow-lg shadow-nykaa-500/30">Add to Shop</button>
               </form>
@@ -380,7 +452,9 @@ const Dashboard = () => {
                 {products.map(p => (
                   <div key={p.id} className="group relative bg-gray-50 rounded-3xl p-6 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-transparent hover:border-nykaa-100">
                     <div className="flex justify-between items-start mb-4">
-                      <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-gray-300 group-hover:text-nykaa-500 transition shadow-sm"><ShoppingBag size={24} /></div>
+                      <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-gray-300 group-hover:text-nykaa-500 transition shadow-sm overflow-hidden">
+                        {p.imageUrl ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" /> : <ShoppingBag size={24} />}
+                      </div>
                       <button onClick={() => handleDelete('/shop/products', p.id)} className="text-gray-300 hover:text-red-500 transition"><Trash2 size={18} /></button>
                     </div>
                     <h4 className="font-bold text-lg text-gray-900 mb-1">{p.name}</h4>
@@ -451,12 +525,18 @@ const Dashboard = () => {
               <h3 className="font-bold text-xl mb-6">Active Newsletters</h3>
               <div className="grid grid-cols-1 gap-4">
                 {newsletters.map(n => (
-                  <div key={n.id} className="p-6 bg-gray-50 rounded-3xl hover:bg-white hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default border border-transparent hover:border-gray-100">
-                    <div className="flex justify-between">
-                      <h4 className="font-bold text-gray-900 text-lg">{n.title}</h4>
-                      <span className="text-xs font-mono text-gray-400">ID: {n.id}</span>
+                  <div key={n.id} className="p-6 bg-gray-50 rounded-3xl hover:bg-white hover:shadow-lg transition-all duration-300 border border-transparent hover:border-gray-100 group">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h4 className="font-bold text-gray-900 text-lg">{n.title}</h4>
+                        <span className="text-xs font-mono text-gray-400">ID: {n.id}</span>
+                      </div>
+                      <button onClick={() => handleViewPosts(n)} className="px-4 py-2 bg-white text-blue-600 text-xs font-bold rounded-xl opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-blue-50">
+                        Publications
+                      </button>
                     </div>
-                    <p className="text-gray-500 mt-2 text-sm">{n.description}</p>
+                    <p className="text-gray-500 text-sm">{n.description}</p>
+                    <button onClick={() => handleViewPosts(n)} className="mt-4 w-full py-2 bg-gray-200/50 text-gray-600 text-xs font-bold rounded-xl hover:bg-gray-200 transition">View History</button>
                   </div>
                 ))}
               </div>
@@ -464,30 +544,187 @@ const Dashboard = () => {
           </div>
         )}
 
-        {activeTab === 'CAMPAIGNS' && (
-          <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 animate-fade-in">
-            <div className="flex gap-2 mb-6 overlow-x-auto">
-              {[{ id: 'ALL', label: 'All' }, { id: 'SMS', label: 'Promotions' }, { id: 'EMAIL', label: 'Newsletters' }, { id: 'PUSH', label: 'Orders' }].map(f => (
-                <button key={f.id} onClick={() => setFilterType(f.id)} className={`px-5 py-2 rounded-full font-bold text-sm transition ${filterType === f.id ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{f.label}</button>
-              ))}
-            </div>
-            <div className="space-y-4">
-              {getFilteredCampaigns().map(c => (
-                <div key={c.id} className="p-6 rounded-3xl bg-gray-50 hover:bg-white hover:shadow-xl transition-all duration-300 border border-transparent hover:border-gray-100 flex items-center justify-between group">
-                  <div>
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${c.type === 'SMS' ? 'bg-pink-100 text-pink-700' : c.type === 'EMAIL' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{c.type}</span>
-                      <span className="text-xs text-gray-400">{new Date(c.createdAt).toLocaleDateString()}</span>
-                    </div>
-                    <h4 className="font-bold text-lg text-gray-900">{c.campaignName}</h4>
-                    <p className="text-sm text-gray-500">Target: {c.targetCities && c.targetCities.length > 0 ? c.targetCities.join(', ') : (c.targetCity || "Global")}</p>
-                  </div>
-                  <div className="flex gap-3 opacity-60 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => handleViewReport(c)} className="bg-white border border-gray-200 px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 transition">Reports</button>
-                    <button onClick={() => handleDelete('/campaigns', c.id)} className="p-2 bg-white text-red-500 rounded-xl hover:bg-red-50 transition"><Trash2 size={20} /></button>
-                  </div>
+        {/* --- NEWSLETTER POSTS MODAL --- */}
+        {viewingNewsletter && (
+          <div className="fixed inset-0 bg-brand-dark/40 backdrop-blur-md flex justify-center items-center p-4 z-[100] animate-fade-in">
+            <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-slide-up ring-1 ring-black/5 flex flex-col max-h-[85vh]">
+              <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white p-8 flex justify-between items-center shrink-0">
+                <div>
+                  <h3 className="font-bold text-2xl">{viewingNewsletter.title}</h3>
+                  <p className="text-gray-400 font-medium">Publication History & Performance</p>
                 </div>
-              ))}
+                <button onClick={() => setViewingNewsletter(null)} className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition text-lg">✕</button>
+              </div>
+
+              <div className="p-8 overflow-y-auto custom-scrollbar">
+                {newsletterPosts.length === 0 ? (
+                  <div className="text-center py-20">
+                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300"><Newspaper size={32} /></div>
+                    <p className="text-gray-500 font-bold">No publications yet.</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-left border-collapse">
+                    <thead className="text-gray-400 text-xs font-bold uppercase sticky top-0 bg-white z-10"><tr className="border-b border-gray-100"><th className="p-4 pl-0">Subject</th><th className="p-4">Status</th><th className="p-4">Sent At</th><th className="p-4">Reach</th><th className="p-4 text-right pr-0">Actions</th></tr></thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {newsletterPosts.map(p => {
+                        // Fallback for null status on legacy posts
+                        const displayStatus = p.status || (p.sentAt ? 'SENT' : 'DRAFT');
+                        return (
+                          <tr key={p.id} className="hover:bg-gray-50/50 transition">
+                            <td className="p-4 pl-0 font-bold text-gray-800">{p.title}</td>
+                            <td className="p-4"><span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${displayStatus === 'SENT' ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600'}`}>{displayStatus}</span></td>
+                            <td className="p-4 text-sm text-gray-500">{p.sentAt ? new Date(p.sentAt).toLocaleString() : 'Scheduled'}</td>
+                            <td className="p-4 font-mono text-xs font-bold text-gray-600">{p.recipientsCount || 0} Sent</td>
+                            <td className="p-4 pr-0 text-right">
+                              <button onClick={() => handleDeletePost(p.id)} className="p-2 bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition"><Trash2 size={16} /></button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- CAMPAIGNS TAB --- */}
+        {/* --- PROMOTIONS TAB (Refactored from CAMPAIGNS) --- */}
+        {activeTab === 'PROMOTIONS' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-in">
+            {/* LIST SECTION */}
+            <div className="lg:col-span-8">
+              <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 h-full">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="font-bold text-xl text-gray-900">Active Offers</h3>
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{campaigns.filter(c => c.type === 'Promotion Offers').length} Active</span>
+                </div>
+
+                <div className="space-y-4">
+                  {campaigns.filter(c => c.type === 'Promotion Offers').map(c => (
+                    <div key={c.id} className="p-6 rounded-3xl bg-gray-50 hover:bg-white hover:shadow-xl transition-all duration-300 border border-transparent hover:border-gray-100 flex items-center justify-between group">
+                      <div>
+                        <div className="flex items-center gap-3 mb-1">
+                          <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-md bg-pink-100 text-pink-700">PROMO</span>
+                          <span className="text-xs text-gray-400">{new Date(c.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <h4 className="font-bold text-lg text-gray-900">{c.campaignName}</h4>
+                        <div className="flex gap-2 mt-1">
+                          {c.channels && c.channels.map(ch => (
+                            <span key={ch} className="text-[10px] font-bold text-gray-500 border border-gray-200 px-1.5 rounded">{ch}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex gap-3 opacity-60 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => handleViewReport(c)} className="bg-white border border-gray-200 px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 transition">Reports</button>
+                        <button onClick={() => handleDelete('/campaigns', c.id)} className="p-2 bg-white text-red-500 rounded-xl hover:bg-red-50 transition"><Trash2 size={20} /></button>
+                      </div>
+                    </div>
+                  ))}
+                  {campaigns.filter(c => c.type === 'Promotion Offers').length === 0 && (
+                    <div className="text-center py-10 text-gray-400">No active promotional offers. Create one!</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* CREATE FORM SECTION */}
+            <div className="lg:col-span-4">
+              <div className="bg-white p-6 rounded-[2.5rem] shadow-xl shadow-gray-200/50 border border-gray-100 sticky top-8">
+                <h3 className="text-lg font-bold mb-6 flex items-center gap-2 text-gray-900 border-b border-gray-100 pb-4">
+                  <div className="w-8 h-8 rounded-lg bg-pink-50 flex items-center justify-center text-pink-600">
+                    <Tag className="w-5 h-5" />
+                  </div>
+                  Create New Offer
+                </h3>
+
+                <form onSubmit={(e) => { e.preventDefault(); handleCampaignSubmit(e); }} className="space-y-5">
+                  {/* Hidden Type Input - Always Promotion Offers */}
+                  <input type="hidden" value="Promotion Offers" />
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-500 uppercase ml-1">Offer Name</label>
+                    <input type="text" placeholder="e.g. Monsoon Sale 50% Off" className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-nykaa-200 rounded-xl p-3.5 outline-none focus:ring-4 focus:ring-nykaa-50 transition-all font-medium text-sm" value={campaignData.name} onChange={(e) => setCampaignData({ ...campaignData, name: e.target.value, type: 'Promotion Offers' })} required />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase ml-1">Channels</label>
+                    <div className="flex flex-wrap gap-2">
+                      {['EMAIL', 'SMS', 'PUSH'].map(channel => (
+                        <label key={channel} className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer border transition-all select-none ${campaignData.channels.includes(channel) ? 'bg-nykaa-50 border-nykaa-200 text-nykaa-700 font-bold' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                          <input
+                            type="checkbox"
+                            checked={campaignData.channels.includes(channel)}
+                            onChange={(e) => {
+                              const newChannels = e.target.checked
+                                ? [...campaignData.channels, channel]
+                                : campaignData.channels.filter(c => c !== channel);
+                              setCampaignData({ ...campaignData, channels: newChannels });
+                            }}
+                            className="hidden"
+                          />
+                          <span className="text-xs">{channel}</span>
+                          {campaignData.channels.includes(channel) && <CheckCircle2 className="w-3 h-3" />}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-500 uppercase ml-1">Details / Content</label>
+                    <textarea
+                      rows="4"
+                      placeholder="Describe the offer..."
+                      className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-nykaa-200 rounded-xl p-3.5 outline-none focus:ring-4 focus:ring-nykaa-50 transition-all font-medium text-sm resize-none"
+                      value={campaignData.content}
+                      onChange={(e) => setCampaignData({ ...campaignData, content: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-500 uppercase ml-1">Target Cities</label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setCityDropdownOpen(!cityDropdownOpen)}
+                        className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-nykaa-200 hover:bg-gray-100 rounded-xl p-3.5 text-left flex items-center justify-between transition-all group"
+                      >
+                        <span className={`text-sm font-medium ${campaignData.targetCities.length ? 'text-gray-900' : 'text-gray-400'}`}>
+                          {campaignData.targetCities.length === 0 ? 'Select cities...' : `${campaignData.targetCities.length} Cities Selected`}
+                        </span>
+                        <MapPin className="w-4 h-4 text-gray-400 group-hover:text-nykaa-500 transition-colors" />
+                      </button>
+
+                      {cityDropdownOpen && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setCityDropdownOpen(false)}></div>
+                          <div className="absolute z-20 w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-y-auto animate-fade-in custom-scrollbar">
+                            <div className="p-2 space-y-1">
+                              {['All Cities', ...new Set(users.map(u => u.city).filter(Boolean))].map(city => (
+                                <label key={city} className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 rounded-lg cursor-pointer transition">
+                                  <input
+                                    type="checkbox"
+                                    checked={campaignData.targetCities.includes(city)}
+                                    onChange={() => handleCityToggle(city)}
+                                    className="w-4 h-4 text-nykaa-600 border-gray-300 rounded focus:ring-nykaa-500"
+                                  />
+                                  <span className="text-sm font-medium text-gray-700">{city}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <button className="w-full bg-gradient-to-r from-nykaa-600 to-brand-purple text-white py-4 rounded-xl font-bold shadow-lg hover:shadow-nykaa-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex justify-center items-center gap-2">
+                    <Send className="w-4 h-4" /> Launch Promotion
+                  </button>
+                </form>
+              </div>
             </div>
           </div>
         )}
@@ -519,18 +756,25 @@ const Dashboard = () => {
                 <div className="flex items-center gap-2 text-sm font-bold text-gray-500"><div className="w-3 h-3 rounded-full bg-green-500"></div>Staff</div>
               </div>
             </div>
+
+            {/* Promotion Channel Distribution */}
             <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
-              <h3 className="font-bold text-xl mb-6 text-center">Campaign Volume</h3>
+              <h3 className="font-bold text-xl mb-2 text-center">Promotions Activity</h3>
+              <p className="text-center text-xs text-gray-400 font-bold uppercase mb-6">Breakdown by Channel</p>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={[
-                  { name: 'SMS', count: campaigns.filter(c => c.type === 'SMS').length },
-                  { name: 'Email', count: campaigns.filter(c => c.type === 'EMAIL').length },
-                  { name: 'Push', count: campaigns.filter(c => c.type === 'PUSH').length }
+                  { name: 'Email', count: campaigns.filter(c => c.type === 'Promotion Offers' && c.channels && c.channels.includes('EMAIL')).length },
+                  { name: 'SMS', count: campaigns.filter(c => c.type === 'Promotion Offers' && c.channels && c.channels.includes('SMS')).length },
+                  { name: 'Push', count: campaigns.filter(c => c.type === 'Promotion Offers' && c.channels && c.channels.includes('PUSH')).length }
                 ]}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 12, fontWeight: 'bold' }} dy={10} />
                   <Tooltip cursor={{ fill: '#f9fafb' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
-                  <Bar dataKey="count" fill="#fc2779" radius={[10, 10, 0, 0]} barSize={50} />
+                  <Bar dataKey="count" fill="#fc2779" radius={[10, 10, 0, 0]} barSize={50}>
+                    <Cell fill="#f59e0b" /> {/* Email - Amber */}
+                    <Cell fill="#3b82f6" /> {/* SMS - Blue */}
+                    <Cell fill="#a855f7" /> {/* Push - Purple */}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -548,11 +792,18 @@ const Dashboard = () => {
             </div>
             <div className="p-0 max-h-96 overflow-y-auto">
               <table className="w-full text-sm text-left">
-                <thead className="bg-gray-50 sticky top-0"><tr className="text-xs uppercase text-gray-500"><th className="p-4">Recipient</th><th className="p-4">Status</th></tr></thead>
+                <thead className="bg-gray-50 sticky top-0"><tr className="text-xs uppercase text-gray-500"><th className="p-4">Recipient</th><th className="p-4">Channels</th><th className="p-4">Status</th></tr></thead>
                 <tbody className="divide-y divide-gray-100">
                   {recipients.map((r, i) => (
                     <tr key={i}>
                       <td className="p-4"><div className="font-bold text-gray-900">{r.name}</div><div className="text-xs text-gray-400">{r.email}</div></td>
+                      <td className="p-4">
+                        <div className="flex gap-1">
+                          {r.channels && r.channels.map(ch => (
+                            <span key={ch} className="px-1.5 py-0.5 rounded text-[10px] font-bold border bg-gray-50 text-gray-500 border-gray-200">{ch}</span>
+                          ))}
+                        </div>
+                      </td>
                       <td className="p-4"><span className="text-green-600 font-bold bg-green-50 px-2 py-1 rounded-md text-xs">{r.status}</span></td>
                     </tr>
                   ))}
