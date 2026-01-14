@@ -6,7 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { 
   PenTool, Users, LogOut, Send, LayoutDashboard, 
   MapPin, MessageSquare, Plus, Edit2, FileText, Download,
-  Tag, Mail, ShoppingBag, Filter, User, BarChart3, Trash2
+  Tag, Mail, Filter, User, BarChart3, Trash2
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -81,12 +81,11 @@ const CreatorDashboard = () => {
 
   const startEditCampaign = (c) => {
     setEditingCampaign(c.id);
-    // Handle both new targetCities (array) and old targetCity (string) format
     const cities = c.targetCities && c.targetCities.length > 0 
       ? c.targetCities 
       : (c.targetCity ? [c.targetCity] : []);
     setCampaignData({ 
-        name: c.campaignName, type: c.type, content: c.content, schedule: '', targetCities: cities
+        name: c.campaignName, type: c.type, content: c.content, schedule: '', targetCities: cities, channels: ['EMAIL'] 
     });
     setActiveTab('CAMPAIGNS'); window.scrollTo(0,0);
   };
@@ -155,11 +154,11 @@ const CreatorDashboard = () => {
     return campaigns.filter(c => c.type === filterType);
   };
 
+  // Removed "Orders" from filters since creators don't manage them here
   const filters = [
       { id: 'ALL', label: 'All', icon: Filter },
       { id: 'Promotion Offers', label: 'Promotions', icon: Tag },
       { id: 'Newsletters', label: 'Newsletters', icon: Mail },
-      { id: 'Order Updates', label: 'Orders', icon: ShoppingBag },
   ];
 
   return (
@@ -197,7 +196,7 @@ const CreatorDashboard = () => {
       {/* MAIN */}
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="mb-8">
-           <h1 className="text-3xl font-bold text-gray-900">{activeTab === 'CAMPAIGNS' ? 'Campaign Orchestration' : activeTab === 'ANALYTICS' ? 'Campaign Analytics' : 'Audience Management'}</h1>
+           <h1 className="text-3xl font-bold text-gray-900 capitalize">{activeTab.toLowerCase().replace('_',' ')}</h1>
            <p className="text-gray-500 mt-1">{activeTab === 'ANALYTICS' ? 'View your campaign performance metrics.' : 'Manage your marketing efforts and customer data.'}</p>
         </header>
 
@@ -206,10 +205,10 @@ const CreatorDashboard = () => {
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
               <h3 className="text-lg font-bold text-gray-800 mb-4">Campaign Types Distribution</h3>
               <ResponsiveContainer width="100%" height={300}>
+                {/* Removed Orders from this chart */}
                 <BarChart data={[
-                  { name: 'promotion offers', count: campaigns.filter(c => c.type === 'SMS').length },
-                  { name: 'Newsletters', count: campaigns.filter(c => c.type === 'EMAIL').length },
-                  { name: 'orders', count: campaigns.filter(c => c.type === 'PUSH').length }
+                  { name: 'Promotions', count: campaigns.filter(c => c.type === 'Promotion Offers' || c.type === 'SMS').length },
+                  { name: 'Newsletters', count: campaigns.filter(c => c.type === 'Newsletters' || c.type === 'EMAIL').length },
                 ]}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
@@ -238,7 +237,7 @@ const CreatorDashboard = () => {
                     <select className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" value={campaignData.type} onChange={(e) => setCampaignData({...campaignData, type: e.target.value})}>
                       <option value="Promotion Offers">Promotional Offer</option>
                       <option value="Newsletters">Newsletter</option>
-                      <option value="Order Updates">Order Update</option>
+                      {/* ORDER UPDATE OPTION REMOVED */}
                     </select>
                   </div>
                   <div>
@@ -303,7 +302,7 @@ const CreatorDashboard = () => {
 
             {/* List */}
             <div className="lg:col-span-2">
-               {/* NEW FILTER TABS */}
+               {/* NEW FILTER TABS - Removed Orders */}
                <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
                   {filters.map(f => (
                       <button key={f.id} onClick={() => setFilterType(f.id)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition whitespace-nowrap ${filterType === f.id ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-purple-50'}`}>
@@ -323,8 +322,8 @@ const CreatorDashboard = () => {
                            <td className="p-4">
                              <div className="font-bold text-gray-900">{c.campaignName}</div>
                              <div className="flex items-center gap-2 mt-1">
-                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${c.type==='SMS'?'bg-blue-100 text-blue-700':c.type==='EMAIL'?'bg-yellow-100 text-yellow-700':'bg-green-100 text-green-700'}`}>
-                                    {c.type==='SMS'?'PROMO':c.type==='EMAIL'?'NEWS':'ORDER'}
+                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${c.type==='SMS' || c.type === 'Promotion Offers'?'bg-blue-100 text-blue-700':'bg-yellow-100 text-yellow-700'}`}>
+                                     {c.type === 'Promotion Offers' || c.type === 'SMS' ? 'PROMO' : 'NEWS'}
                                 </span>
                                 <span className="text-xs text-gray-400">{new Date(c.createdAt).toLocaleDateString()}</span>
                              </div>
@@ -348,10 +347,9 @@ const CreatorDashboard = () => {
           </div>
         )}
 
-        {/* ... (Users Tab code remains exactly the same as before) ... */}
         {activeTab === 'USERS' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Plus className="w-5 h-5 text-purple-600"/> Add Subscriber</h3>
                 <form onSubmit={handleUserSubmit} className="space-y-3">
                    <input type="text" placeholder="Name" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none" value={userData.name} onChange={e => setUserData({...userData, name: e.target.value})} required />
@@ -369,8 +367,8 @@ const CreatorDashboard = () => {
                       <button onClick={handleUpload} className="bg-green-600 text-white px-3 py-1 rounded-lg text-xs font-bold hover:bg-green-700">Upload</button>
                    </div>
                 </div>
-             </div>
-             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 lg:col-span-2 overflow-hidden">
+              </div>
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 lg:col-span-2 overflow-hidden">
                 <table className="w-full text-sm text-left">
                   <thead className="bg-gray-50 text-gray-500"><tr><th className="p-4">Name</th><th className="p-4">Contact</th><th className="p-4">Location</th><th className="p-4">Edit</th></tr></thead>
                   <tbody className="divide-y divide-gray-100">
@@ -384,7 +382,7 @@ const CreatorDashboard = () => {
                     ))}
                   </tbody>
                 </table>
-             </div>
+              </div>
           </div>
         )}
       </main>

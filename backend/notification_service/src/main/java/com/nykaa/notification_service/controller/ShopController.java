@@ -21,7 +21,7 @@ public class ShopController {
     private final PreferenceRepository preferenceRepository;
     private final NotificationLogRepository logRepository;
 
-    // --- PRODUCTS ---
+    // --- PRODUCTS (Store Manager) ---
 
     @GetMapping("/products")
     public ResponseEntity<List<Product>> getAllProducts() {
@@ -39,22 +39,23 @@ public class ShopController {
         return ResponseEntity.ok("Deleted");
     }
 
-    // --- ORDERS ---
+    // --- ORDERS (Order Management) ---
 
     @GetMapping("/orders/all")
     public ResponseEntity<List<Orders>> getAllOrders() {
         return ResponseEntity.ok(orderRepository.findAll());
     }
 
+    // USER: Place an Order
     @PostMapping("/order/{productId}")
     public ResponseEntity<?> placeOrder(@PathVariable Long productId) {
         try {
-            // 1. Get User
+            // 1. Get Logged-in User
             String email = SecurityContextHolder.getContext().getAuthentication().getName();
             User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found"));
             Product product = productRepository.findById(productId).orElseThrow(() -> new RuntimeException("Product not found"));
 
-            // 2. Save Order
+            // 2. Save Order to DB
             Orders order = new Orders();
             order.setUserId(user.getUserId());
             order.setUserName(user.getName());
@@ -64,8 +65,8 @@ public class ShopController {
             order.setStatus("CONFIRMED");
             orderRepository.save(order);
 
-            // 3. Trigger Notification (Safely)
-            safeSendNotification(user.getUserId(), "Order Confirmed: " + product.getName());
+            // 3. Trigger "Order Placed" Notification
+            safeSendNotification(user.getUserId(), "Order Placed: " + product.getName());
 
             return ResponseEntity.ok("Order Placed Successfully!");
         } catch (Exception e) {
@@ -74,38 +75,50 @@ public class ShopController {
         }
     }
     
+    // ADMIN: Update Status (This was crashing before)
     @PutMapping("/orders/{id}/status")
     public ResponseEntity<?> updateOrderStatus(@PathVariable Long id, @RequestParam String status) {
         try {
-            // 1. Update Order
+            // 1. Find and Update Order
             Orders order = orderRepository.findById(id).orElseThrow(() -> new RuntimeException("Order not found"));
             order.setStatus(status);
             orderRepository.save(order);
 
-            // 2. Trigger Notification (Safely)
-            safeSendNotification(order.getUserId(), "Order Update: Your order is " + status);
+            // 2. Trigger "Status Update" Notification
+            // This runs safely. Even if it fails (e.g. user has no preferences), the Order Status still updates.
+            safeSendNotification(order.getUserId(), "Order Update: Your order is now " + status);
 
             return ResponseEntity.ok("Status Updated");
         } catch (Exception e) {
-            e.printStackTrace(); // Check your console for this error!
+            e.printStackTrace();
             return ResponseEntity.status(500).body("Error updating status: " + e.getMessage());
         }
     }
 
-    // --- HELPERS ---
-    
-    // Wraps notification logic so it never crashes the main request
+    @GetMapping("/my-orders")
+    public ResponseEntity<List<Orders>> getMyOrders() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email).orElseThrow();
+        return ResponseEntity.ok(orderRepository.findByUserId(user.getUserId()));
+    }
+
+    // --- HELPER: Safe Notification Logic ---
     private void safeSendNotification(String userId, String message) {
         try {
+            // Check if user has preferences set
             Preference pref = preferenceRepository.findByUserUserId(userId);
+            
+            // If user has NO preferences record, we can't check 'isOrderUpdates'. 
+            // You might want to default to sending it, or just skip. 
+            // Here we skip if null to prevent crash.
             if (pref != null && pref.isOrderUpdates()) {
                 if (pref.isEmailOrders()) createLog(userId, "EMAIL", message);
                 if (pref.isSmsOrders()) createLog(userId, "SMS", message);
                 if (pref.isPushOrders()) createLog(userId, "PUSH", message);
             }
         } catch (Exception e) {
-            System.err.println("Failed to send notification: " + e.getMessage());
-            // We swallow the error here so the Order update doesn't fail
+            // Log the error but DO NOT throw it back to the main method
+            System.err.println("Notification failed for user " + userId + ": " + e.getMessage());
         }
     }
 
@@ -115,14 +128,12 @@ public class ShopController {
         log.setChannel(channel);
         log.setStatus("SENT");
         log.setSentAt(LocalDateTime.now());
-        log.setCampaignId(0L); // 0 indicates Transactional/Order message
+        // Use a dummy ID or '0' for transactional messages that aren't part of a mass campaign
+        log.setCampaignId(0L); 
+        // Note: You might want to save the 'message' content in NotificationLog if your entity supports it.
+        // Currently NotificationLog doesn't have a 'content' field in your previous upload, 
+        // so the frontend will just see the Campaign Name logic. 
+        // For now, this just logs that a message WAS sent.
         logRepository.save(log);
-    }
-    
-    @GetMapping("/my-orders")
-    public ResponseEntity<List<Orders>> getMyOrders() {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByEmail(email).orElseThrow();
-        return ResponseEntity.ok(orderRepository.findByUserId(user.getUserId()));
     }
 }

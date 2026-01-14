@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
-import { LogOut, Bell, Settings, MapPin, ShoppingBag, Tag, Mail, User, Package, CheckCircle2 } from 'lucide-react';
+import { LogOut, Bell, Settings, MapPin, ShoppingBag, Tag, Mail, User, Package, CheckCircle2, MessageSquare, Smartphone } from 'lucide-react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -147,8 +147,8 @@ const UserHome = () => {
                 <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2"><Settings className="w-4 h-4"/> Preferences</h3>
                 
                 {/* PREFERENCES LIST */}
-                <div className="space-y-4">
-                   {/* PROMOTIONS */}
+                <div className="space-y-6">
+                   {/* 1. PROMOTIONS */}
                   <div>
                     <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Promotions</h4>
                     <div className="space-y-1">
@@ -161,7 +161,7 @@ const UserHome = () => {
                     </div>
                   </div>
 
-                  {/* NEWSLETTERS (ADDED) */}
+                  {/* 2. NEWSLETTERS (ADDED) */}
                   <div>
                     <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Newsletters</h4>
                     <div className="space-y-1">
@@ -174,7 +174,7 @@ const UserHome = () => {
                     </div>
                   </div>
 
-                   {/* ORDERS */}
+                   {/* 3. ORDERS */}
                   <div>
                     <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Orders</h4>
                     <div className="space-y-1">
@@ -223,19 +223,37 @@ const UserHome = () => {
                     ) : (
                         getFilteredNotifications().map((n, i) => (
                         <div key={i} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition flex gap-4 animate-in fade-in slide-in-from-bottom-2">
+                            {/* LARGE ICON (LEFT) */}
                             <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                n.channels?.includes('SMS') ? 'bg-blue-50 text-blue-600' : 
-                                n.channels?.includes('EMAIL') ? 'bg-yellow-50 text-yellow-600' : 'bg-pink-50 text-pink-600'
+                                n.campaignType === 'Order Updates' ? 'bg-green-50 text-green-600' : 'bg-pink-50 text-pink-600'
                             }`}>
                                 {n.campaignType === 'Order Updates' ? <Package size={20}/> : <Tag size={20}/>}
                             </div>
-                            <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-gray-100 text-gray-600">
-                                        {n.campaignType || 'SYSTEM'}
-                                    </span>
-                                    <span className="text-xs text-gray-400">{new Date(n.receivedAt).toLocaleString()}</span>
+                            
+                            <div className="flex-1">
+                                {/* HEADER ROW */}
+                                <div className="flex justify-between items-start mb-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-gray-100 text-gray-600">
+                                            {n.campaignType || 'SYSTEM'}
+                                        </span>
+                                        <span className="text-xs text-gray-400">{new Date(n.receivedAt).toLocaleString()}</span>
+                                    </div>
+                                    
+                                    {/* CHANNEL ICONS (RIGHT) */}
+                                    <div className="flex gap-1">
+                                        {n.channels && n.channels.includes('EMAIL') && (
+                                            <span title="Received via Email" className="bg-yellow-50 text-yellow-600 p-1.5 rounded-full"><Mail size={12}/></span>
+                                        )}
+                                        {n.channels && n.channels.includes('SMS') && (
+                                            <span title="Received via SMS" className="bg-blue-50 text-blue-600 p-1.5 rounded-full"><MessageSquare size={12}/></span>
+                                        )}
+                                        {n.channels && n.channels.includes('PUSH') && (
+                                            <span title="Received via Push Notification" className="bg-purple-50 text-purple-600 p-1.5 rounded-full"><Smartphone size={12}/></span>
+                                        )}
+                                    </div>
                                 </div>
+                                
                                 <h4 className="font-bold text-gray-800">{n.message}</h4>
                                 <p className="text-gray-600 text-sm mt-1">{n.content}</p>
                             </div>
