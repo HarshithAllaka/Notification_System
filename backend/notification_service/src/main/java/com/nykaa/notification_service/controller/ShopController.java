@@ -80,7 +80,7 @@ public class ShopController {
 
             // Trigger Notification
             System.out.println("TRIGGERING STATUS UPDATE (" + status + ") FOR USER ID: " + order.getUserId());
-            String subject = "Order Status: " + status;
+            String subject = "Order #" + id + ": " + order.getProductName() + " - " + status;
             String body = "Your order for " + order.getProductName() + " is now " + status + ".";
             
             safeSendNotification(order.getUserId(), subject, body);

@@ -154,7 +154,7 @@ public class NewsletterController {
         
         log.setCampaignId(-1L); 
         log.setNewsletterPostId(post.getId());
-        log.setMessage(post.getTitle());
+        log.setMessage(post.getNewsletter().getTitle() + ": " + post.getTitle());
         log.setContent(post.getContent());
         
         logRepository.save(log);

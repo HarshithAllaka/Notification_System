@@ -167,7 +167,7 @@ public class NotificationScheduler {
         log.setChannel(channel);
         log.setStatus("SENT");
         log.setSentAt(LocalDateTime.now());
-        log.setMessage(post.getTitle());
+        log.setMessage(post.getNewsletter().getTitle() + ": " + post.getTitle());
         log.setContent(post.getContent());
         logRepository.save(log);
     }
