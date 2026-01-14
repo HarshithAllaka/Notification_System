@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 import java.time.LocalDateTime;
 
@@ -51,23 +50,18 @@ public class UserController {
         Preference existing = preferenceRepository.findByUserUserId(userId);
         if(existing == null) return ResponseEntity.badRequest().build();
 
-        // 1. Update Granular Fields (The specific checkboxes)
+        // 1. Update Granular Fields
         existing.setEmailOffers(updatedPref.isEmailOffers());
         existing.setSmsOffers(updatedPref.isSmsOffers());
         existing.setPushOffers(updatedPref.isPushOffers());
-        
         existing.setEmailNewsletters(updatedPref.isEmailNewsletters());
         existing.setSmsNewsletters(updatedPref.isSmsNewsletters());
         existing.setPushNewsletters(updatedPref.isPushNewsletters());
-        
         existing.setEmailOrders(updatedPref.isEmailOrders());
         existing.setSmsOrders(updatedPref.isSmsOrders());
         existing.setPushOrders(updatedPref.isPushOrders());
 
-        // 2. AUTO-SYNC MASTER SWITCHES (The Logic You Requested)
-        // If at least one channel is TRUE, Master is TRUE. 
-        // If ALL channels are FALSE, Master is automatically FALSE.
-        
+        // 2. Auto-Sync Master Switches
         existing.setOffers(existing.isEmailOffers() || existing.isSmsOffers() || existing.isPushOffers());
         existing.setNewsletter(existing.isEmailNewsletters() || existing.isSmsNewsletters() || existing.isPushNewsletters());
         existing.setOrderUpdates(existing.isEmailOrders() || existing.isSmsOrders() || existing.isPushOrders());
@@ -86,7 +80,7 @@ public class UserController {
 
         List<NotificationDto> finalNotifications = new ArrayList<>();
 
-        // 1. CAMPAIGNS (ID != 0)
+        // 1. CAMPAIGNS (Grouped by Campaign ID)
         Map<Long, List<NotificationLog>> groupedCampaignLogs = logs.stream()
                 .filter(log -> log.getCampaignId() != null && log.getCampaignId() != 0)
                 .collect(Collectors.groupingBy(NotificationLog::getCampaignId));
@@ -100,27 +94,31 @@ public class UserController {
             }
         });
 
-        // 2. ORDERS (ID == 0 or NULL)
+        // 2. ORDERS (Grouped by Unique Content) -- FIX IS HERE
         List<NotificationLog> orderLogs = logs.stream()
                 .filter(log -> log.getCampaignId() == null || log.getCampaignId() == 0)
                 .collect(Collectors.toList());
 
-        for (NotificationLog log : orderLogs) {
-            // Only add if we have a message text (prevents empty boxes)
-            String title = (log.getMessage() != null) ? log.getMessage() : "Order Update";
-            String body = (log.getContent() != null) ? log.getContent() : "Status updated";
+        // We group by "Message + Content" to combine the 3 logs (Email/SMS/Push) into one
+        Map<String, List<NotificationLog>> groupedOrderLogs = orderLogs.stream()
+                .filter(log -> log.getMessage() != null && log.getContent() != null)
+                .collect(Collectors.groupingBy(log -> log.getMessage() + "|||" + log.getContent()));
+
+        groupedOrderLogs.forEach((key, uniqueLogs) -> {
+            // Get all channels for this specific message
+            List<String> channels = uniqueLogs.stream().map(NotificationLog::getChannel).distinct().collect(Collectors.toList());
             
-            // Only add if the message content actually exists (avoids null pointers)
-            if(log.getMessage() != null || log.getContent() != null) {
-                finalNotifications.add(new NotificationDto(
-                    title, 
-                    body, 
-                    "Order Updates", 
-                    List.of(log.getChannel()), 
-                    log.getSentAt()
-                ));
-            }
-        }
+            // Get the details from the first log in the group
+            NotificationLog firstLog = uniqueLogs.get(0);
+            
+            finalNotifications.add(new NotificationDto(
+                firstLog.getMessage(), 
+                firstLog.getContent(), 
+                "Order Updates", 
+                channels, // Now sends ["EMAIL", "SMS", "PUSH"] in one object
+                firstLog.getSentAt()
+            ));
+        });
 
         finalNotifications.sort((a, b) -> b.getReceivedAt().compareTo(a.getReceivedAt()));
         return ResponseEntity.ok(finalNotifications);

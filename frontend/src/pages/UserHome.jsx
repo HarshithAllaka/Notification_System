@@ -22,6 +22,31 @@ const UserHome = () => {
   const [activeCategory, setActiveCategory] = useState('ALL');
   const [activeChannel, setActiveChannel] = useState('ALL');
 
+  // --- HELPER: GROUP NOTIFICATIONS ---
+  // This groups separate logs (Email/SMS) into one object if message content is same
+  const groupNotifications = (rawList) => {
+    const groupedMap = new Map();
+    (rawList || []).forEach(n => {
+        const key = `${n.message}|${n.content}|${n.campaignType}`;
+        
+        // Normalize channels to always be an array
+        const currentChannels = Array.isArray(n.channels) ? n.channels : (n.channels ? [n.channels] : []);
+
+        if (groupedMap.has(key)) {
+            const existing = groupedMap.get(key);
+            // Merge unique channels
+            existing.channels = [...new Set([...(existing.channels || []), ...currentChannels])];
+            // Keep the latest time
+            if (new Date(n.receivedAt) > new Date(existing.receivedAt)) {
+                existing.receivedAt = n.receivedAt;
+            }
+        } else {
+            groupedMap.set(key, { ...n, channels: currentChannels });
+        }
+    });
+    return Array.from(groupedMap.values()).sort((a, b) => new Date(b.receivedAt) - new Date(a.receivedAt));
+  };
+
   // --- INITIAL LOAD ---
   useEffect(() => {
     const loadData = async () => {
@@ -40,8 +65,8 @@ const UserHome = () => {
            api.get('/shop/my-orders')
         ]);
 
-        // Set Data
-        setNotifications((notifRes.data || []).sort((a, b) => new Date(b.receivedAt) - new Date(a.receivedAt)));
+        // Set Data with Grouping Logic Applied
+        setNotifications(groupNotifications(notifRes.data));
         setPref(prefRes.data || {});
         setProducts(prodRes.data || []);
         setMyOrders(ordRes.data || []);
@@ -80,8 +105,10 @@ const UserHome = () => {
             api.get('/shop/my-orders'),
             api.get('/users/notifications')
         ]);
+        
         setMyOrders(ordRes.data);
-        setNotifications((notifRes.data || []).sort((a, b) => new Date(b.receivedAt) - new Date(a.receivedAt)));
+        // Apply grouping logic to the refreshed notifications too
+        setNotifications(groupNotifications(notifRes.data));
         
         // 3. Switch to Inbox to see the notification
         setActiveTab('INBOX');
@@ -161,7 +188,7 @@ const UserHome = () => {
                     </div>
                   </div>
 
-                  {/* 2. NEWSLETTERS (ADDED) */}
+                  {/* 2. NEWSLETTERS */}
                   <div>
                     <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Newsletters</h4>
                     <div className="space-y-1">
