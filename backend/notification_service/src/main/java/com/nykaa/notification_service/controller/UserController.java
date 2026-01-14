@@ -15,6 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -30,45 +31,50 @@ public class UserController {
     private final NotificationLogRepository logRepository;
     private final CampaignRepository campaignRepository;
 
-    // Helper to get current logged-in user's email from the security token
     private String getCurrentUserEmail() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return auth.getName();
     }
 
-    // 1. Get My Preferences
     @GetMapping("/preferences")
     public ResponseEntity<Preference> getMyPreferences() {
         String email = getCurrentUserEmail();
-        // Find the user ID based on email
         String userId = userRepository.findByEmail(email).get().getUserId();
-        // Use the repository we just created
         return ResponseEntity.ok(preferenceRepository.findByUserUserId(userId));
     }
 
-    // 2. Update My Preferences
     @PutMapping("/preferences")
     public ResponseEntity<Preference> updatePreferences(@RequestBody Preference updatedPref) {
         String email = getCurrentUserEmail();
         String userId = userRepository.findByEmail(email).get().getUserId();
         
         Preference existing = preferenceRepository.findByUserUserId(userId);
-        existing.setOffers(updatedPref.isOffers());
-        existing.setNewsletter(updatedPref.isNewsletter());
-        existing.setOrderUpdates(updatedPref.isOrderUpdates());
+        if(existing == null) return ResponseEntity.badRequest().build();
+
+        // 1. Update Granular Fields (The specific checkboxes)
         existing.setEmailOffers(updatedPref.isEmailOffers());
         existing.setSmsOffers(updatedPref.isSmsOffers());
         existing.setPushOffers(updatedPref.isPushOffers());
+        
         existing.setEmailNewsletters(updatedPref.isEmailNewsletters());
         existing.setSmsNewsletters(updatedPref.isSmsNewsletters());
         existing.setPushNewsletters(updatedPref.isPushNewsletters());
+        
         existing.setEmailOrders(updatedPref.isEmailOrders());
         existing.setSmsOrders(updatedPref.isSmsOrders());
         existing.setPushOrders(updatedPref.isPushOrders());
+
+        // 2. AUTO-SYNC MASTER SWITCHES (The Logic You Requested)
+        // If at least one channel is TRUE, Master is TRUE. 
+        // If ALL channels are FALSE, Master is automatically FALSE.
+        
+        existing.setOffers(existing.isEmailOffers() || existing.isSmsOffers() || existing.isPushOffers());
+        existing.setNewsletter(existing.isEmailNewsletters() || existing.isSmsNewsletters() || existing.isPushNewsletters());
+        existing.setOrderUpdates(existing.isEmailOrders() || existing.isSmsOrders() || existing.isPushOrders());
+
         return ResponseEntity.ok(preferenceRepository.save(existing));
     }
 
-    // 3. Get My Notifications
     @GetMapping("/notifications")
     public ResponseEntity<List<NotificationDto>> getMyNotifications() {
         String email = getCurrentUserEmail();
@@ -78,29 +84,45 @@ public class UserController {
                 .filter(log -> log.getUserId().equals(userId))
                 .collect(Collectors.toList());
 
-        // Group by campaignId
-        Map<Long, List<NotificationLog>> groupedLogs = logs.stream()
+        List<NotificationDto> finalNotifications = new ArrayList<>();
+
+        // 1. CAMPAIGNS (ID != 0)
+        Map<Long, List<NotificationLog>> groupedCampaignLogs = logs.stream()
+                .filter(log -> log.getCampaignId() != null && log.getCampaignId() != 0)
                 .collect(Collectors.groupingBy(NotificationLog::getCampaignId));
 
-        List<NotificationDto> notifications = groupedLogs.entrySet().stream().map(entry -> {
-            Long campaignId = entry.getKey();
-            List<NotificationLog> campaignLogs = entry.getValue();
+        groupedCampaignLogs.forEach((campaignId, campaignLogs) -> {
             Campaign c = campaignRepository.findById(campaignId).orElse(null);
-            if (c == null) return null;
+            if (c != null) {
+                List<String> channels = campaignLogs.stream().map(NotificationLog::getChannel).distinct().collect(Collectors.toList());
+                LocalDateTime latestTime = campaignLogs.stream().map(NotificationLog::getSentAt).max(LocalDateTime::compareTo).orElse(LocalDateTime.now());
+                finalNotifications.add(new NotificationDto(c.getCampaignName(), c.getContent(), c.getType(), channels, latestTime));
+            }
+        });
 
-            List<String> channels = campaignLogs.stream()
-                    .map(NotificationLog::getChannel)
-                    .distinct()
-                    .collect(Collectors.toList());
+        // 2. ORDERS (ID == 0 or NULL)
+        List<NotificationLog> orderLogs = logs.stream()
+                .filter(log -> log.getCampaignId() == null || log.getCampaignId() == 0)
+                .collect(Collectors.toList());
 
-            LocalDateTime latestSentAt = campaignLogs.stream()
-                    .map(NotificationLog::getSentAt)
-                    .max(LocalDateTime::compareTo)
-                    .orElse(LocalDateTime.now());
+        for (NotificationLog log : orderLogs) {
+            // Only add if we have a message text (prevents empty boxes)
+            String title = (log.getMessage() != null) ? log.getMessage() : "Order Update";
+            String body = (log.getContent() != null) ? log.getContent() : "Status updated";
+            
+            // Only add if the message content actually exists (avoids null pointers)
+            if(log.getMessage() != null || log.getContent() != null) {
+                finalNotifications.add(new NotificationDto(
+                    title, 
+                    body, 
+                    "Order Updates", 
+                    List.of(log.getChannel()), 
+                    log.getSentAt()
+                ));
+            }
+        }
 
-            return new NotificationDto(c.getCampaignName(), c.getContent(), c.getType(), channels, latestSentAt);
-        }).filter(Objects::nonNull).collect(Collectors.toList());
-
-        return ResponseEntity.ok(notifications);
+        finalNotifications.sort((a, b) -> b.getReceivedAt().compareTo(a.getReceivedAt()));
+        return ResponseEntity.ok(finalNotifications);
     }
 }

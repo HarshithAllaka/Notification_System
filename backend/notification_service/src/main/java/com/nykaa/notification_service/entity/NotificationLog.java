@@ -13,8 +13,18 @@ public class NotificationLog {
     private Long id;
 
     private String userId;
-    private Long campaignId;
+    
+    // 0 = Transactional (Order), >0 = Marketing Campaign
+    private Long campaignId; 
+    
     private LocalDateTime sentAt;
     private String status;
     private String channel; // EMAIL, SMS, PUSH
+    
+    // --- THESE ARE CRITICAL FOR ORDER MESSAGES ---
+    @Column(columnDefinition = "TEXT") 
+    private String message; // Stores: "Order Shipped"
+    
+    @Column(columnDefinition = "TEXT")
+    private String content; // Stores: "Your order #123 is on the way..."
 }

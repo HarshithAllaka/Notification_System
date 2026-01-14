@@ -29,7 +29,7 @@ public class UserService {
         user.setRole(Role.USER);
         User savedUser = userRepository.save(user);
 
-        createDefaultPreferences(savedUser); // Helper method
+        createDefaultPreferences(savedUser); 
         return savedUser;
     }
 
@@ -42,30 +42,37 @@ public class UserService {
         
         if (user.getRole() == null) user.setRole(Role.USER);
         if (user.getUserId() == null) user.setUserId(UUID.randomUUID().toString());
-        user.setActive(true); // Default to active
+        user.setActive(true); 
         
         User savedUser = userRepository.save(user);
 
-        createDefaultPreferences(savedUser); // Ensures they get notifications!
+        createDefaultPreferences(savedUser);
         return savedUser;
     }
 
-    // --- Helper to avoid code duplication ---
+    // --- Helper: Set Defaults Correctly ---
     private void createDefaultPreferences(User user) {
         Preference pref = new Preference();
         pref.setUser(user);
-        // Promotion Offers
+        
+        // --- FIX: Turn ON Master Switches by default ---
+        pref.setOffers(true);
+        pref.setNewsletter(true);
+        pref.setOrderUpdates(true);
+
+        // --- Turn ON Granular Switches by default ---
         pref.setEmailOffers(true);
         pref.setSmsOffers(true);
         pref.setPushOffers(true);
-        // Newsletters
+        
         pref.setEmailNewsletters(true);
         pref.setSmsNewsletters(true);
         pref.setPushNewsletters(true);
-        // Order Updates
+        
         pref.setEmailOrders(true);
         pref.setSmsOrders(true);
         pref.setPushOrders(true);
+        
         preferenceRepository.save(pref);
     }
 
@@ -75,12 +82,12 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
-    // --- 4. Update Preferences ---
+    // --- 4. Update Preferences (Restored from your code) ---
     public User updatePreferences(String email, Preference updatedPref) {
         User user = getUserProfile(email);
         Preference pref = user.getPreference();
         
-        if (pref == null) { // Safety check
+        if (pref == null) { 
             pref = new Preference();
             pref.setUser(user);
         }
@@ -119,12 +126,11 @@ public class UserService {
         userRepository.delete(user);
     }
 
-    // --- NEW: Toggle Active Status ---
     public String toggleUserActiveStatus(String userId) {
         User user = userRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         
-        user.setActive(!user.isActive()); // Flip status
+        user.setActive(!user.isActive());
         userRepository.save(user);
         
         return user.isActive() ? "User Activated" : "User Deactivated";

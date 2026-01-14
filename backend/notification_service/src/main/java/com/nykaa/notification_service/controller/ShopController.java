@@ -21,8 +21,7 @@ public class ShopController {
     private final PreferenceRepository preferenceRepository;
     private final NotificationLogRepository logRepository;
 
-    // --- PRODUCTS (Store Manager) ---
-
+    // --- PRODUCTS ---
     @GetMapping("/products")
     public ResponseEntity<List<Product>> getAllProducts() {
         return ResponseEntity.ok(productRepository.findAll());
@@ -39,23 +38,19 @@ public class ShopController {
         return ResponseEntity.ok("Deleted");
     }
 
-    // --- ORDERS (Order Management) ---
-
+    // --- ORDERS ---
     @GetMapping("/orders/all")
     public ResponseEntity<List<Orders>> getAllOrders() {
         return ResponseEntity.ok(orderRepository.findAll());
     }
 
-    // USER: Place an Order
     @PostMapping("/order/{productId}")
     public ResponseEntity<?> placeOrder(@PathVariable Long productId) {
         try {
-            // 1. Get Logged-in User
             String email = SecurityContextHolder.getContext().getAuthentication().getName();
             User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found"));
             Product product = productRepository.findById(productId).orElseThrow(() -> new RuntimeException("Product not found"));
 
-            // 2. Save Order to DB
             Orders order = new Orders();
             order.setUserId(user.getUserId());
             order.setUserName(user.getName());
@@ -65,33 +60,35 @@ public class ShopController {
             order.setStatus("CONFIRMED");
             orderRepository.save(order);
 
-            // 3. Trigger "Order Placed" Notification
-            safeSendNotification(user.getUserId(), "Order Placed: " + product.getName());
+            // Trigger Notification
+            System.out.println("TRIGGERING ORDER PLACED NOTIFICATION FOR: " + user.getName());
+            safeSendNotification(user.getUserId(), "Order Placed", "Your order for " + product.getName() + " has been placed successfully.");
 
             return ResponseEntity.ok("Order Placed Successfully!");
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(500).body("Error placing order: " + e.getMessage());
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
         }
     }
     
-    // ADMIN: Update Status (This was crashing before)
     @PutMapping("/orders/{id}/status")
     public ResponseEntity<?> updateOrderStatus(@PathVariable Long id, @RequestParam String status) {
         try {
-            // 1. Find and Update Order
             Orders order = orderRepository.findById(id).orElseThrow(() -> new RuntimeException("Order not found"));
             order.setStatus(status);
             orderRepository.save(order);
 
-            // 2. Trigger "Status Update" Notification
-            // This runs safely. Even if it fails (e.g. user has no preferences), the Order Status still updates.
-            safeSendNotification(order.getUserId(), "Order Update: Your order is now " + status);
+            // Trigger Notification
+            System.out.println("TRIGGERING STATUS UPDATE (" + status + ") FOR USER ID: " + order.getUserId());
+            String subject = "Order Status: " + status;
+            String body = "Your order for " + order.getProductName() + " is now " + status + ".";
+            
+            safeSendNotification(order.getUserId(), subject, body);
 
             return ResponseEntity.ok("Status Updated");
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(500).body("Error updating status: " + e.getMessage());
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
         }
     }
 
@@ -102,38 +99,52 @@ public class ShopController {
         return ResponseEntity.ok(orderRepository.findByUserId(user.getUserId()));
     }
 
-    // --- HELPER: Safe Notification Logic ---
-    private void safeSendNotification(String userId, String message) {
+    // --- HELPER: ROBUST NOTIFICATION LOGIC ---
+    private void safeSendNotification(String userId, String subject, String body) {
         try {
-            // Check if user has preferences set
             Preference pref = preferenceRepository.findByUserUserId(userId);
             
-            // If user has NO preferences record, we can't check 'isOrderUpdates'. 
-            // You might want to default to sending it, or just skip. 
-            // Here we skip if null to prevent crash.
-            if (pref != null && pref.isOrderUpdates()) {
-                if (pref.isEmailOrders()) createLog(userId, "EMAIL", message);
-                if (pref.isSmsOrders()) createLog(userId, "SMS", message);
-                if (pref.isPushOrders()) createLog(userId, "PUSH", message);
+            boolean sendEmail = true;
+            boolean sendSms = true;
+            boolean sendPush = true;
+
+            // If preferences exist, respect them. If NULL, default to TRUE so the user still gets it.
+            if (pref != null) {
+                // If "Order Updates" is disabled globally, don't send anything
+                if (!pref.isOrderUpdates()) {
+                    System.out.println("User has disabled Order Updates. Skipping.");
+                    return;
+                }
+                sendEmail = pref.isEmailOrders();
+                sendSms = pref.isSmsOrders();
+                sendPush = pref.isPushOrders();
+            } else {
+                System.out.println("Preferences not found for user. Defaulting to SEND ALL.");
             }
+
+            if (sendEmail) createLog(userId, "EMAIL", subject, body);
+            if (sendSms) createLog(userId, "SMS", subject, body);
+            if (sendPush) createLog(userId, "PUSH", subject, body);
+
         } catch (Exception e) {
-            // Log the error but DO NOT throw it back to the main method
-            System.err.println("Notification failed for user " + userId + ": " + e.getMessage());
+            System.err.println("Notification Error: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
-    private void createLog(String userId, String channel, String message) {
+    private void createLog(String userId, String channel, String subject, String body) {
         NotificationLog log = new NotificationLog();
         log.setUserId(userId);
         log.setChannel(channel);
         log.setStatus("SENT");
         log.setSentAt(LocalDateTime.now());
-        // Use a dummy ID or '0' for transactional messages that aren't part of a mass campaign
-        log.setCampaignId(0L); 
-        // Note: You might want to save the 'message' content in NotificationLog if your entity supports it.
-        // Currently NotificationLog doesn't have a 'content' field in your previous upload, 
-        // so the frontend will just see the Campaign Name logic. 
-        // For now, this just logs that a message WAS sent.
+        log.setCampaignId(0L); // 0 = Transactional
+        
+        // SAVE THE TEXT
+        log.setMessage(subject);
+        log.setContent(body);
+        
         logRepository.save(log);
+        System.out.println("LOG SAVED: " + subject + " via " + channel);
     }
 }
