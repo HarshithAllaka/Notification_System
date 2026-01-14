@@ -14,17 +14,20 @@ public class NotificationLog {
 
     private String userId;
     
-    // 0 = Transactional (Order), >0 = Marketing Campaign
+    // 0 = Transactional (Order), >0 = Marketing Campaign, -1 = Newsletter (Legacy/Fallback)
     private Long campaignId; 
+    
+    // --- NEW FIELD FOR NEWSLETTERS ---
+    private Long newsletterPostId; // Links to the specific issue/post
     
     private LocalDateTime sentAt;
     private String status;
     private String channel; // EMAIL, SMS, PUSH
     
-    // --- THESE ARE CRITICAL FOR ORDER MESSAGES ---
+    // --- CONTENT STORAGE ---
     @Column(columnDefinition = "TEXT") 
-    private String message; // Stores: "Order Shipped"
+    private String message; // Title
     
     @Column(columnDefinition = "TEXT")
-    private String content; // Stores: "Your order #123 is on the way..."
+    private String content; // Body
 }

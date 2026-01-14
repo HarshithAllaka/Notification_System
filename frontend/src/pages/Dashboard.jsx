@@ -6,7 +6,8 @@ import 'react-toastify/dist/ReactToastify.css';
 import { 
   Users, Briefcase, Megaphone, LogOut, UploadCloud, 
   Plus, Trash2, Edit2, Shield, Search, Power,
-  Filter, Tag, Mail, ShoppingBag, User, BarChart3, Package
+  Filter, Tag, Mail, ShoppingBag, User, BarChart3, Package,
+  Newspaper, Send
 } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -19,7 +20,8 @@ const Dashboard = () => {
   const [staff, setStaff] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [products, setProducts] = useState([]); 
-  const [orders, setOrders] = useState([]); // <--- NEW: Orders State
+  const [orders, setOrders] = useState([]); 
+  const [newsletters, setNewsletters] = useState([]); // <--- NEW
   
   // UI States
   const [searchTerm, setSearchTerm] = useState('');
@@ -31,6 +33,11 @@ const Dashboard = () => {
   const [userData, setUserData] = useState({ name: '', email: '', password: '', city: '', phone: '' });
   const [staffData, setStaffData] = useState({ name: '', email: '', password: '', role: 'CREATOR' });
   const [productData, setProductData] = useState({ name: '', price: '', description: '' });
+  
+  // Newsletter Forms (NEW)
+  const [newsletterData, setNewsletterData] = useState({ title: '', description: '' });
+  const [postData, setPostData] = useState({ title: '', content: '' });
+  const [selectedNewsletterId, setSelectedNewsletterId] = useState(null); // For publishing
 
   // Reporting
   const [selectedCampaign, setSelectedCampaign] = useState(null);
@@ -40,19 +47,20 @@ const Dashboard = () => {
 
   const fetchAllData = async () => {
     try {
-      // Added /shop/orders/all to the fetch list
-      const [userRes, staffRes, campRes, prodRes, orderRes] = await Promise.all([
+      const [userRes, staffRes, campRes, prodRes, orderRes, newsRes] = await Promise.all([
         api.get('/admin/users/all'),
         api.get('/admin/all'),
         api.get('/campaigns/history'),
         api.get('/shop/products'),
-        api.get('/shop/orders/all') // <--- NEW Fetch
+        api.get('/shop/orders/all'),
+        api.get('/newsletters/all') // <--- NEW Fetch
       ]);
       setUsers(userRes.data);
       setStaff(staffRes.data);
       setCampaigns(campRes.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
       setProducts(prodRes.data);
       setOrders((orderRes.data || []).sort((a,b) => new Date(b.orderDate) - new Date(a.orderDate)));
+      setNewsletters(newsRes.data || []); // <--- Set Newsletters
     } catch (err) { console.error("Error loading data", err); }
   };
 
@@ -101,13 +109,35 @@ const Dashboard = () => {
     } catch(err){ toast.error("Failed to add product."); }
   };
 
-  // --- ORDER HANDLERS (NEW) ---
+  // --- ORDER HANDLERS ---
   const handleOrderStatus = async (orderId, newStatus) => {
       try {
           await api.put(`/shop/orders/${orderId}/status?status=${newStatus}`);
           toast.success("Order Status Updated!");
           fetchAllData();
       } catch(err) { toast.error("Failed to update status"); }
+  };
+
+  // --- NEWSLETTER HANDLERS (NEW) ---
+  const handleCreateNewsletter = async (e) => {
+      e.preventDefault();
+      try {
+          await api.post('/newsletters/create', newsletterData);
+          toast.success("Newsletter Created!");
+          setNewsletterData({ title: '', description: '' });
+          fetchAllData();
+      } catch(err) { toast.error("Failed to create newsletter"); }
+  };
+
+  const handlePublishPost = async (e) => {
+      e.preventDefault();
+      if(!selectedNewsletterId) return toast.error("Select a newsletter first!");
+      try {
+          await api.post(`/newsletters/${selectedNewsletterId}/publish`, postData);
+          toast.success("Post Published to Subscribers!");
+          setPostData({ title: '', content: '' });
+          setSelectedNewsletterId(null);
+      } catch(err) { toast.error("Publishing failed."); }
   };
 
   // --- REPORTING ---
@@ -144,7 +174,8 @@ const Dashboard = () => {
               { id: 'USERS', icon: Users, label: 'Customer Base' }, 
               { id: 'STAFF', icon: Briefcase, label: 'Staff Management' }, 
               { id: 'PRODUCTS', icon: ShoppingBag, label: 'Store Manager' }, 
-              { id: 'ORDERS', icon: Package, label: 'Order Management' }, // <--- NEW TAB
+              { id: 'ORDERS', icon: Package, label: 'Order Management' }, 
+              { id: 'NEWSLETTERS', icon: Newspaper, label: 'Newsletters' }, // <--- NEW TAB
               { id: 'CAMPAIGNS', icon: Megaphone, label: 'Campaigns' }, 
               { id: 'ANALYTICS', icon: BarChart3, label: 'Analytics' }
           ].map((item) => (
@@ -168,12 +199,17 @@ const Dashboard = () => {
               {activeTab === 'STAFF' && 'Staff Directory'}
               {activeTab === 'PRODUCTS' && 'Store Inventory'} 
               {activeTab === 'ORDERS' && 'Order Management'}
+              {activeTab === 'NEWSLETTERS' && 'Newsletter Publishing'}
               {activeTab === 'CAMPAIGNS' && 'System Campaigns'}
               {activeTab === 'ANALYTICS' && 'System Analytics'}
             </h1>
             <p className="text-gray-500 text-sm mt-1">Manage and organize your system data.</p>
           </div>
-          <button onClick={() => navigate('/creator-dashboard')} className="flex items-center gap-2 bg-gradient-to-r from-pink-600 to-purple-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg hover:shadow-xl hover:scale-105 transition"><Plus className="w-5 h-5" /> Launch Campaign</button>
+          {activeTab !== 'NEWSLETTERS' && (
+             <button onClick={() => navigate('/creator-dashboard')} className="flex items-center gap-2 bg-gradient-to-r from-pink-600 to-purple-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg hover:shadow-xl hover:scale-105 transition">
+                <Plus className="w-5 h-5" /> Launch Campaign
+             </button>
+          )}
         </header>
 
         {/* --- USERS TAB --- */}
@@ -256,10 +292,10 @@ const Dashboard = () => {
            </div>
         )}
 
-        {/* --- PRODUCTS TAB (STORE MANAGER) --- */}
+        {/* --- PRODUCTS TAB --- */}
         {activeTab === 'PRODUCTS' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* ADD PRODUCT FORM */}
+                {/* ADD PRODUCT */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
                     <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                         <ShoppingBag className="w-5 h-5 text-pink-600" /> Add Product
@@ -321,7 +357,7 @@ const Dashboard = () => {
             </div>
         )}
 
-        {/* --- ORDERS TAB (NEW) --- */}
+        {/* --- ORDERS TAB --- */}
         {activeTab === 'ORDERS' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
@@ -378,6 +414,68 @@ const Dashboard = () => {
                         </tbody>
                     </table>
                 )}
+            </div>
+        )}
+
+        {/* --- NEWSLETTERS TAB (NEW) --- */}
+        {activeTab === 'NEWSLETTERS' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                
+                {/* 1. Create Newsletter */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <Plus className="w-5 h-5 text-pink-600"/> Create Newsletter
+                    </h3>
+                    <form onSubmit={handleCreateNewsletter} className="space-y-4">
+                        <input type="text" placeholder="Title (e.g. Weekly Tech)" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none"
+                            value={newsletterData.title} onChange={e => setNewsletterData({...newsletterData, title: e.target.value})} required />
+                        <textarea placeholder="Description (e.g. Tech tips every Monday)" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none h-20 resize-none"
+                            value={newsletterData.description} onChange={e => setNewsletterData({...newsletterData, description: e.target.value})} />
+                        <button className="w-full bg-black text-white py-3 rounded-xl font-bold hover:bg-gray-800 transition">Create Newsletter</button>
+                    </form>
+                </div>
+
+                {/* 2. Publish Post */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <Send className="w-5 h-5 text-blue-600"/> Publish Issue
+                    </h3>
+                    <form onSubmit={handlePublishPost} className="space-y-4">
+                        <select className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none"
+                            value={selectedNewsletterId || ''} onChange={e => setSelectedNewsletterId(e.target.value)} required>
+                            <option value="" disabled>Select Newsletter to Publish To</option>
+                            {newsletters.map(n => <option key={n.id} value={n.id}>{n.title}</option>)}
+                        </select>
+                        <input type="text" placeholder="Issue Title (e.g. Issue #1: Welcome!)" className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none"
+                            value={postData.title} onChange={e => setPostData({...postData, title: e.target.value})} required />
+                        <textarea placeholder="Write your content here..." className="w-full bg-gray-50 border-gray-200 rounded-lg p-3 outline-none h-32 resize-none"
+                            value={postData.content} onChange={e => setPostData({...postData, content: e.target.value})} required />
+                        <button className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition">Publish & Notify Subscribers</button>
+                    </form>
+                </div>
+
+                {/* 3. Existing Newsletters List */}
+                <div className="lg:col-span-2">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4">Active Newsletters</h3>
+                    {newsletters.length === 0 ? (
+                        <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 text-gray-400">
+                            No newsletters created yet.
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {newsletters.map(n => (
+                                <div key={n.id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                                    <h4 className="font-bold text-gray-900">{n.title}</h4>
+                                    <p className="text-sm text-gray-500 mt-1 line-clamp-2">{n.description}</p>
+                                    <div className="mt-4 pt-4 border-t border-gray-50 flex justify-between items-center text-xs text-gray-400">
+                                        <span>Created: {new Date(n.createdAt).toLocaleDateString()}</span>
+                                        <span className="font-bold text-pink-600">ID: {n.id}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
         )}
 

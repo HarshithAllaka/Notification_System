@@ -80,9 +80,9 @@ public class UserController {
 
         List<NotificationDto> finalNotifications = new ArrayList<>();
 
-        // 1. CAMPAIGNS (Grouped by Campaign ID)
+        // 1. CAMPAIGNS (Grouped by Campaign ID > 0)
         Map<Long, List<NotificationLog>> groupedCampaignLogs = logs.stream()
-                .filter(log -> log.getCampaignId() != null && log.getCampaignId() != 0)
+                .filter(log -> log.getCampaignId() != null && log.getCampaignId() > 0)
                 .collect(Collectors.groupingBy(NotificationLog::getCampaignId));
 
         groupedCampaignLogs.forEach((campaignId, campaignLogs) -> {
@@ -94,28 +94,46 @@ public class UserController {
             }
         });
 
-        // 2. ORDERS (Grouped by Unique Content) -- FIX IS HERE
+        // 2. NEWSLETTERS (Grouped by Message Content, Campaign ID == -1)
+        List<NotificationLog> newsletterLogs = logs.stream()
+                .filter(log -> log.getCampaignId() != null && log.getCampaignId() == -1)
+                .collect(Collectors.toList());
+
+        Map<String, List<NotificationLog>> groupedNewsletterLogs = newsletterLogs.stream()
+                 .filter(log -> log.getMessage() != null && log.getContent() != null)
+                 .collect(Collectors.groupingBy(log -> log.getMessage() + "|||" + log.getContent()));
+
+        groupedNewsletterLogs.forEach((key, uniqueLogs) -> {
+            List<String> channels = uniqueLogs.stream().map(NotificationLog::getChannel).distinct().collect(Collectors.toList());
+            NotificationLog firstLog = uniqueLogs.get(0);
+            
+            finalNotifications.add(new NotificationDto(
+                firstLog.getMessage(), 
+                firstLog.getContent(), 
+                "Newsletters", // Category Label
+                channels, 
+                firstLog.getSentAt()
+            ));
+        });
+
+        // 3. ORDERS (Grouped by Message Content, Campaign ID == 0 or NULL)
         List<NotificationLog> orderLogs = logs.stream()
                 .filter(log -> log.getCampaignId() == null || log.getCampaignId() == 0)
                 .collect(Collectors.toList());
 
-        // We group by "Message + Content" to combine the 3 logs (Email/SMS/Push) into one
         Map<String, List<NotificationLog>> groupedOrderLogs = orderLogs.stream()
                 .filter(log -> log.getMessage() != null && log.getContent() != null)
                 .collect(Collectors.groupingBy(log -> log.getMessage() + "|||" + log.getContent()));
 
         groupedOrderLogs.forEach((key, uniqueLogs) -> {
-            // Get all channels for this specific message
             List<String> channels = uniqueLogs.stream().map(NotificationLog::getChannel).distinct().collect(Collectors.toList());
-            
-            // Get the details from the first log in the group
             NotificationLog firstLog = uniqueLogs.get(0);
             
             finalNotifications.add(new NotificationDto(
                 firstLog.getMessage(), 
                 firstLog.getContent(), 
                 "Order Updates", 
-                channels, // Now sends ["EMAIL", "SMS", "PUSH"] in one object
+                channels, 
                 firstLog.getSentAt()
             ));
         });

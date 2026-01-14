@@ -149,6 +149,14 @@ const UserHome = () => {
              <button onClick={() => setActiveTab('INBOX')} className={`font-bold pb-1 border-b-2 transition ${activeTab==='INBOX' ? 'text-pink-600 border-pink-600' : 'text-gray-400 border-transparent hover:text-gray-600'}`}>Inbox</button>
              <button onClick={() => setActiveTab('SHOP')} className={`font-bold pb-1 border-b-2 transition ${activeTab==='SHOP' ? 'text-pink-600 border-pink-600' : 'text-gray-400 border-transparent hover:text-gray-600'}`}>Shop</button>
              <button onClick={() => setActiveTab('ORDERS')} className={`font-bold pb-1 border-b-2 transition ${activeTab==='ORDERS' ? 'text-pink-600 border-pink-600' : 'text-gray-400 border-transparent hover:text-gray-600'}`}>My Orders</button>
+             
+             {/* --- NEW LINK: Explore Newsletters --- */}
+             <button 
+                onClick={() => navigate('/newsletters')} 
+                className="font-bold pb-1 text-gray-400 border-b-2 border-transparent hover:text-pink-600 transition flex items-center gap-1"
+             >
+                Explore Newsletters <span className="text-[10px] bg-pink-100 text-pink-600 px-1.5 py-0.5 rounded-full">NEW</span>
+             </button>
           </div>
 
           <div className="flex items-center gap-4">

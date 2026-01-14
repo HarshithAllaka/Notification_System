@@ -6,6 +6,7 @@ import UserHome from './pages/UserHome';
 import CreatorDashboard from './pages/CreatorDashboard'; // <--- IMPORT
 import ViewerDashboard from './pages/ViewerDashboard';   // <--- IMPORT
 import Profile from './pages/Profile';   // <--- IMPORT
+import UserNewsletters from './pages/UserNewsletters';
 
 function App() {
   const ProtectedRoute = ({ children }) => {
@@ -27,6 +28,8 @@ function App() {
         <Route path="/creator-dashboard" element={<ProtectedRoute><CreatorDashboard /></ProtectedRoute>} />
         <Route path="/viewer-dashboard" element={<ProtectedRoute><ViewerDashboard /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+
+        <Route path="/newsletters" element={<UserNewsletters />} />
 
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
