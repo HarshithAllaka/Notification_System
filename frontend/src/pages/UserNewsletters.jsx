@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
-import { LogOut, Bell, Mail, MessageSquare, Smartphone, CheckCircle2, Plus, User, ArrowLeft } from 'lucide-react';
+import { LogOut, Mail, MessageSquare, Smartphone, CheckCircle2, Plus, ArrowLeft } from 'lucide-react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 const UserNewsletters = () => {
     const navigate = useNavigate();
-    const [user, setUser] = useState({});
     
     // Data State
     const [newsletters, setNewsletters] = useState([]);
-    const [mySubs, setMySubs] = useState([]); // Map of newsletterId -> Subscription Object
+    const [mySubs, setMySubs] = useState({}); // Object map { newsletterId: subObject }
     const [loading, setLoading] = useState(true);
 
     // Load Data
@@ -19,7 +18,6 @@ const UserNewsletters = () => {
         const loadData = async () => {
             const storedUser = localStorage.getItem('user');
             if (!storedUser) { navigate('/login'); return; }
-            setUser(JSON.parse(storedUser));
 
             try {
                 const [allRes, subRes] = await Promise.all([
@@ -27,11 +25,11 @@ const UserNewsletters = () => {
                     api.get('/newsletters/my-subscriptions')
                 ]);
 
-                setNewsletters(allRes.data);
+                setNewsletters(allRes.data || []);
                 
-                // Convert Array of Subs to a Map for easy lookup: { newsletterId: subObject }
+                // Convert Array to Map for easier lookup
                 const subMap = {};
-                subRes.data.forEach(sub => {
+                (subRes.data || []).forEach(sub => {
                     subMap[sub.newsletter.id] = sub;
                 });
                 setMySubs(subMap);
@@ -48,14 +46,22 @@ const UserNewsletters = () => {
     // --- ACTIONS ---
 
     const handleSubscribe = async (newsletterId) => {
-        // Default Preferences: Email=True, SMS=False, Push=True
-        const defaultPref = { receiveEmail: true, receiveSms: false, receivePush: true };
+        // Default: Email=True, SMS=True, Push=True (Enable ALL by default)
+        const defaultPref = { receiveEmail: true, receiveSms: true, receivePush: true };
         
+        // Optimistic UI Update (Immediate visual feedback)
+        const tempSub = { 
+            id: 'temp-' + Date.now(), 
+            newsletter: { id: newsletterId }, 
+            ...defaultPref 
+        };
+        setMySubs(prev => ({ ...prev, [newsletterId]: tempSub }));
+
         try {
             await api.post(`/newsletters/${newsletterId}/subscribe`, defaultPref);
             toast.success("Subscribed!");
             
-            // Refresh Subscriptions
+            // Refresh to get real ID from server
             const res = await api.get('/newsletters/my-subscriptions');
             const subMap = {};
             res.data.forEach(sub => { subMap[sub.newsletter.id] = sub; });
@@ -63,31 +69,40 @@ const UserNewsletters = () => {
             
         } catch (err) {
             toast.error(err.response?.data || "Failed to subscribe");
+            // Revert state if failed
+            setMySubs(prev => {
+                const newState = { ...prev };
+                delete newState[newsletterId];
+                return newState;
+            });
         }
     };
 
-    const updateChannel = async (subId, channel, currentValue) => {
-        const sub = Object.values(mySubs).find(s => s.id === subId);
+    const updateChannel = async (newsletterId, channel) => {
+        const sub = mySubs[newsletterId];
         if(!sub) return;
 
-        // Create update payload
-        const updates = {
-            receiveEmail: sub.receiveEmail,
-            receiveSms: sub.receiveSms,
-            receivePush: sub.receivePush,
-            [channel]: !currentValue // Toggle the specific channel
-        };
+        // Calculate new value (Toggle)
+        const newValue = !sub[channel];
 
-        // Optimistic UI Update (Update state immediately for speed)
-        const updatedSub = { ...sub, ...updates };
-        setMySubs(prev => ({ ...prev, [sub.newsletter.id]: updatedSub }));
+        // Create updated object
+        const updatedSub = { ...sub, [channel]: newValue };
+
+        // 1. Optimistic UI Update (Update State Immediately)
+        setMySubs(prev => ({ ...prev, [newsletterId]: updatedSub }));
 
         try {
-            await api.put(`/newsletters/subscription/${subId}`, updates);
+            // 2. Send API Request
+            // We send the FULL object because PUT usually replaces resource
+            await api.put(`/newsletters/subscription/${sub.id}`, {
+                receiveEmail: updatedSub.receiveEmail,
+                receiveSms: updatedSub.receiveSms,
+                receivePush: updatedSub.receivePush
+            });
         } catch (err) {
             toast.error("Failed to update preference");
             // Revert on failure
-            setMySubs(prev => ({ ...prev, [sub.newsletter.id]: sub }));
+            setMySubs(prev => ({ ...prev, [newsletterId]: sub }));
         }
     };
 
@@ -105,7 +120,6 @@ const UserNewsletters = () => {
                 </div>
                 
                 <div className="flex items-center gap-4">
-                     {/* Back to Home Button */}
                     <button onClick={() => navigate('/user-home')} className="text-gray-500 hover:text-pink-600 font-bold text-sm flex items-center gap-2 transition">
                          <ArrowLeft size={16}/> Back to Inbox
                     </button>
@@ -158,19 +172,23 @@ const UserNewsletters = () => {
                                                 <label className={`flex items-center gap-2 cursor-pointer p-2 rounded-lg border transition ${subscription.receiveEmail ? 'border-yellow-200 bg-yellow-50' : 'border-gray-100 bg-gray-50 opacity-60'}`}>
                                                     <Mail size={16} className={subscription.receiveEmail ? "text-yellow-600" : "text-gray-400"}/>
                                                     <span className={`text-sm font-bold ${subscription.receiveEmail ? "text-yellow-800" : "text-gray-500"}`}>Email</span>
+                                                    
+                                                    {/* FIXED: Controlled Input */}
                                                     <input type="checkbox" className="hidden" 
-                                                        checked={subscription.receiveEmail} 
-                                                        onChange={() => updateChannel(subscription.id, 'receiveEmail', subscription.receiveEmail)} 
+                                                        checked={!!subscription.receiveEmail} 
+                                                        onChange={() => updateChannel(n.id, 'receiveEmail')} 
                                                     />
                                                 </label>
 
                                                 {/* SMS Toggle */}
-                                                <label className={`flex items-center gap-2 cursor-pointer p-2 rounded-lg border transition ${subscription.receiveSMS ? 'border-blue-200 bg-blue-50' : 'border-gray-100 bg-gray-50 opacity-60'}`}>
-                                                    <MessageSquare size={16} className={subscription.receiveSMS ? "text-blue-600" : "text-gray-400"}/>
-                                                    <span className={`text-sm font-bold ${subscription.receiveSMS ? "text-blue-800" : "text-gray-500"}`}>SMS</span>
+                                                <label className={`flex items-center gap-2 cursor-pointer p-2 rounded-lg border transition ${subscription.receiveSms ? 'border-blue-200 bg-blue-50' : 'border-gray-100 bg-gray-50 opacity-60'}`}>
+                                                    <MessageSquare size={16} className={subscription.receiveSms ? "text-blue-600" : "text-gray-400"}/>
+                                                    <span className={`text-sm font-bold ${subscription.receiveSms ? "text-blue-800" : "text-gray-500"}`}>SMS</span>
+                                                    
+                                                    {/* FIXED: Controlled Input (Note case: receiveSms matches backend) */}
                                                     <input type="checkbox" className="hidden" 
-                                                        checked={subscription.receiveSMS} 
-                                                        onChange={() => updateChannel(subscription.id, 'receiveSMS', subscription.receiveSMS)} 
+                                                        checked={!!subscription.receiveSms} 
+                                                        onChange={() => updateChannel(n.id, 'receiveSms')} 
                                                     />
                                                 </label>
 
@@ -178,9 +196,11 @@ const UserNewsletters = () => {
                                                 <label className={`flex items-center gap-2 cursor-pointer p-2 rounded-lg border transition ${subscription.receivePush ? 'border-purple-200 bg-purple-50' : 'border-gray-100 bg-gray-50 opacity-60'}`}>
                                                     <Smartphone size={16} className={subscription.receivePush ? "text-purple-600" : "text-gray-400"}/>
                                                     <span className={`text-sm font-bold ${subscription.receivePush ? "text-purple-800" : "text-gray-500"}`}>Push</span>
+                                                    
+                                                    {/* FIXED: Controlled Input */}
                                                     <input type="checkbox" className="hidden" 
-                                                        checked={subscription.receivePush} 
-                                                        onChange={() => updateChannel(subscription.id, 'receivePush', subscription.receivePush)} 
+                                                        checked={!!subscription.receivePush} 
+                                                        onChange={() => updateChannel(n.id, 'receivePush')} 
                                                     />
                                                 </label>
                                             </div>
