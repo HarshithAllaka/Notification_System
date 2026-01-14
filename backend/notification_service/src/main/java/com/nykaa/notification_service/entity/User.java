@@ -43,7 +43,6 @@ public class User {
     private Role role;
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
-    @JsonIgnore // Prevents Infinite Loop
     private Preference preference;
     
     @PrePersist

@@ -3,58 +3,33 @@ import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { User, Save, LogOut, ArrowLeft, Mail, Phone, MapPin, Shield, Edit3 } from 'lucide-react';
+import { User, Save, LogOut, ArrowLeft, Mail, Phone, MapPin, Shield, Edit3, Bell, Lock, Sparkles } from 'lucide-react';
 
 const Profile = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState({});
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    city: '',
-    password: '',
-    oldPassword: '',
-    emailOffers: true,
-    smsOffers: true,
-    pushOffers: true,
-    emailNewsletters: true,
-    smsNewsletters: true,
-    pushNewsletters: true,
-    emailOrders: true,
-    smsOrders: true,
-    pushOrders: true
+    name: '', email: '', phone: '', city: '', password: '', oldPassword: '',
+    emailOffers: true, smsOffers: true, pushOffers: true,
+    emailNewsletters: true, smsNewsletters: true, pushNewsletters: true,
+    emailOrders: true, smsOrders: true, pushOrders: true
   });
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
+  useEffect(() => { fetchProfile(); }, []);
 
   const fetchProfile = async () => {
     try {
       const { data } = await api.get('/profile/me');
       setProfile(data);
       setFormData({
-        name: data.name || '',
-        email: data.email || '',
-        phone: data.phone || '',
-        city: data.city || '',
-        password: '',
-        oldPassword: '',
-        emailOffers: data.preference?.emailOffers ?? true,
-        smsOffers: data.preference?.smsOffers ?? true,
-        pushOffers: data.preference?.pushOffers ?? true,
-        emailNewsletters: data.preference?.emailNewsletters ?? true,
-        smsNewsletters: data.preference?.smsNewsletters ?? true,
-        pushNewsletters: data.preference?.pushNewsletters ?? true,
-        emailOrders: data.preference?.emailOrders ?? true,
-        smsOrders: data.preference?.smsOrders ?? true,
-        pushOrders: data.preference?.pushOrders ?? true
+        name: data.name || '', email: data.email || '', phone: data.phone || '', city: data.city || '',
+        password: '', oldPassword: '',
+        emailOffers: data.preference?.emailOffers ?? true, smsOffers: data.preference?.smsOffers ?? true, pushOffers: data.preference?.pushOffers ?? true,
+        emailNewsletters: data.preference?.emailNewsletters ?? true, smsNewsletters: data.preference?.smsNewsletters ?? true, pushNewsletters: data.preference?.pushNewsletters ?? true,
+        emailOrders: data.preference?.emailOrders ?? true, smsOrders: data.preference?.smsOrders ?? true, pushOrders: data.preference?.pushOrders ?? true
       });
-    } catch (err) {
-      toast.error('Failed to load profile');
-    }
+    } catch (err) { toast.error('Failed to load profile'); }
   };
 
   const handleSave = async () => {
@@ -63,296 +38,156 @@ const Profile = () => {
       setProfile(data);
       setEditMode(false);
       toast.success('Profile updated successfully');
-    } catch (err) {
-      toast.error('Failed to update profile');
-    }
+    } catch (err) { toast.error('Failed to update profile'); }
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate('/login');
-  };
-
-  const goBack = () => {
-    navigate(-1);
-  };
+  const handleLogout = () => { localStorage.clear(); navigate('/login'); };
+  const goBack = () => navigate(-1);
 
   const getRoleColor = (role) => {
     switch (role) {
-      case 'ADMIN': return 'bg-purple-100 text-purple-800';
-      case 'CREATOR': return 'bg-blue-100 text-blue-800';
-      case 'VIEWER': return 'bg-green-100 text-green-800';
-      default: return 'bg-pink-100 text-pink-800';
+      case 'ADMIN': return 'bg-purple-100 text-purple-700';
+      case 'CREATOR': return 'bg-pink-100 text-pink-700';
+      case 'VIEWER': return 'bg-blue-100 text-blue-700';
+      default: return 'bg-gray-100 text-gray-700';
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 font-sans text-gray-800">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <button 
-            onClick={goBack} 
-            className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 border border-gray-100"
-          >
-            <ArrowLeft size={20} />
-            Back
-          </button>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            My Profile
-          </h1>
-          <button 
-            onClick={handleLogout} 
-            className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all duration-200 shadow-sm"
-          >
-            <LogOut size={20} />
-            Logout
-          </button>
+    <div className="min-h-screen bg-gray-50 from-gray-50 to-white font-sans text-gray-800">
+      <ToastContainer position="top-center" theme="colored" autoClose={2000} />
+
+      {/* Header */}
+      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button onClick={goBack} className="p-2 hover:bg-gray-100 rounded-full transition text-gray-500"><ArrowLeft size={20} /></button>
+          <h1 className="text-xl font-bold text-gray-900">My Profile</h1>
         </div>
+        <button onClick={handleLogout} className="text-red-500 font-bold text-sm hover:bg-red-50 px-4 py-2 rounded-xl transition flex items-center gap-2">
+          <LogOut size={16} /> Logout
+        </button>
+      </div>
 
-        <div className="max-w-2xl mx-auto">
-          {/* Profile Card */}
-          <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
-            {/* Profile Header */}
-            <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-8 text-white relative text-center">
-              <h2 className="text-2xl font-bold mb-1">{profile.name}</h2>
-              <p className="text-blue-100 mb-2">{profile.email}</p>
-              <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${getRoleColor(profile.role)}`}>
-                <Shield size={14} />
-                {profile.role}
-              </span>
+      <main className="max-w-4xl mx-auto p-6 md:p-10 animate-fade-in-up">
+
+        {/* Profile Header Card */}
+        <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 mb-8 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-r from-nykaa-500 to-brand-purple"></div>
+
+          <div className="relative flex flex-col md:flex-row items-end -mt-12 md:items-center justify-between gap-6 pt-12">
+            <div className="flex items-end gap-6">
+              <div className="w-32 h-32 rounded-[2rem] bg-white p-1 shadow-xl">
+                <div className="w-full h-full bg-gray-100 rounded-[1.8rem] flex items-center justify-center text-4xl font-bold text-gray-400">
+                  {profile.name?.charAt(0)}
+                </div>
+              </div>
+              <div className="mb-2">
+                <h1 className="text-3xl font-extrabold text-gray-900">{profile.name}</h1>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-gray-500 font-medium">{profile.email}</span>
+                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${getRoleColor(profile.role)}`}>{profile.role}</span>
+                </div>
+              </div>
             </div>
-
-            {/* Profile Content */}
-            <div className="p-8">
-              {editMode ? (
-                <div className="space-y-6">
-                  <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                    <Edit3 size={20} />
-                    Edit Profile
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                        <User size={16} />
-                        Full Name
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                        placeholder="Enter your name"
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                        <Mail size={16} />
-                        Email Address
-                      </label>
-                      <input
-                        type="email"
-                        value={formData.email}
-                        disabled
-                        className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed"
-                      />
-                    </div>
-
-                    {profile.role !== 'ADMIN' && profile.role !== 'CREATOR' && profile.role !== 'VIEWER' && (
-                      <>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                            <Phone size={16} />
-                            Phone Number
-                          </label>
-                          <input
-                            type="text"
-                            value={formData.phone}
-                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                            className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                            placeholder="Enter phone number"
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                            <MapPin size={16} />
-                            City
-                          </label>
-                          <input
-                            type="text"
-                            value={formData.city}
-                            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                            className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                            placeholder="Enter your city"
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                      <Shield size={20} />
-                      Notification Preferences
-                    </h4>
-                    
-                    <div className="bg-gray-50 p-4 rounded-xl space-y-4">
-                      <h5 className="font-medium text-gray-700">Promotion Offers</h5>
-                      <div className="grid grid-cols-3 gap-4">
-                        <label className="flex items-center gap-2">
-                          <input type="checkbox" checked={formData.emailOffers} onChange={(e) => setFormData({ ...formData, emailOffers: e.target.checked })} />
-                          <span className="text-sm">Email</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input type="checkbox" checked={formData.smsOffers} onChange={(e) => setFormData({ ...formData, smsOffers: e.target.checked })} />
-                          <span className="text-sm">SMS</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input type="checkbox" checked={formData.pushOffers} onChange={(e) => setFormData({ ...formData, pushOffers: e.target.checked })} />
-                          <span className="text-sm">Push</span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="bg-gray-50 p-4 rounded-xl space-y-4">
-                      <h5 className="font-medium text-gray-700">Newsletters</h5>
-                      <div className="grid grid-cols-3 gap-4">
-                        <label className="flex items-center gap-2">
-                          <input type="checkbox" checked={formData.emailNewsletters} onChange={(e) => setFormData({ ...formData, emailNewsletters: e.target.checked })} />
-                          <span className="text-sm">Email</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input type="checkbox" checked={formData.smsNewsletters} onChange={(e) => setFormData({ ...formData, smsNewsletters: e.target.checked })} />
-                          <span className="text-sm">SMS</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input type="checkbox" checked={formData.pushNewsletters} onChange={(e) => setFormData({ ...formData, pushNewsletters: e.target.checked })} />
-                          <span className="text-sm">Push</span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="bg-gray-50 p-4 rounded-xl space-y-4">
-                      <h5 className="font-medium text-gray-700">Order Updates</h5>
-                      <div className="grid grid-cols-3 gap-4">
-                        <label className="flex items-center gap-2">
-                          <input type="checkbox" checked={formData.emailOrders} onChange={(e) => setFormData({ ...formData, emailOrders: e.target.checked })} />
-                          <span className="text-sm">Email</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input type="checkbox" checked={formData.smsOrders} onChange={(e) => setFormData({ ...formData, smsOrders: e.target.checked })} />
-                          <span className="text-sm">SMS</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input type="checkbox" checked={formData.pushOrders} onChange={(e) => setFormData({ ...formData, pushOrders: e.target.checked })} />
-                          <span className="text-sm">Push</span>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Old Password</label>
-                    <input
-                      type="password"
-                      value={formData.oldPassword}
-                      onChange={(e) => setFormData({ ...formData, oldPassword: e.target.value })}
-                      className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="Enter your current password"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">New Password</label>
-                    <input
-                      type="password"
-                      value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="Leave empty to keep current password"
-                    />
-                  </div>
-
-                  <div className="flex gap-4 pt-6">
-                    <button
-                      onClick={handleSave}
-                      className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-6 rounded-xl font-semibold hover:from-blue-600 hover:to-purple-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-lg"
-                    >
-                      <Save size={20} />
-                      Save Changes
-                    </button>
-                    <button
-                      onClick={() => setEditMode(false)}
-                      className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-all duration-200"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-xl font-bold text-gray-800">Profile Information</h3>
-                    <button
-                      onClick={() => setEditMode(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all duration-200 shadow-sm"
-                    >
-                      <Edit3 size={16} />
-                      Edit
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-gray-50 p-4 rounded-xl">
-                      <div className="flex items-center gap-3 mb-2">
-                        <User size={18} className="text-blue-500" />
-                        <span className="text-sm font-medium text-gray-600">Full Name</span>
-                      </div>
-                      <p className="text-gray-800 font-semibold">{profile.name}</p>
-                    </div>
-
-                    <div className="bg-gray-50 p-4 rounded-xl">
-                      <div className="flex items-center gap-3 mb-2">
-                        <Mail size={18} className="text-blue-500" />
-                        <span className="text-sm font-medium text-gray-600">Email</span>
-                      </div>
-                      <p className="text-gray-800 font-semibold">{profile.email}</p>
-                    </div>
-
-                    {profile.phone && (
-                      <div className="bg-gray-50 p-4 rounded-xl">
-                        <div className="flex items-center gap-3 mb-2">
-                          <Phone size={18} className="text-blue-500" />
-                          <span className="text-sm font-medium text-gray-600">Phone</span>
-                        </div>
-                        <p className="text-gray-800 font-semibold">{profile.phone}</p>
-                      </div>
-                    )}
-
-                    {profile.city && (
-                      <div className="bg-gray-50 p-4 rounded-xl">
-                        <div className="flex items-center gap-3 mb-2">
-                          <MapPin size={18} className="text-blue-500" />
-                          <span className="text-sm font-medium text-gray-600">City</span>
-                        </div>
-                        <p className="text-gray-800 font-semibold">{profile.city}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+            <div className="mb-4 md:mb-0">
+              {!editMode && (
+                <button onClick={() => setEditMode(true)} className="bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition shadow-lg flex items-center gap-2">
+                  <Edit3 size={18} /> Edit Profile
+                </button>
               )}
             </div>
           </div>
         </div>
-      </div>
-      <ToastContainer 
-        position="top-right"
-        autoClose={3000}
-        theme="colored"
-      />
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+          {/* LEFT COLUMN: Personal Info */}
+          <div className="md:col-span-2 space-y-6">
+            <section className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
+              <h3 className="font-bold text-xl text-gray-900 mb-6 flex items-center gap-2"><User className="text-nykaa-500" /> Personal Details</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">Full Name</label>
+                  <input disabled={!editMode} type="text" className={`w-full p-4 rounded-xl font-medium transition-all ${editMode ? 'bg-gray-50 focus:bg-white border-transparent focus:ring-4 focus:ring-nykaa-50' : 'bg-transparent text-gray-900'}`} value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">Email</label>
+                  <input disabled type="email" className="w-full p-4 rounded-xl font-medium bg-gray-50/50 text-gray-500 cursor-not-allowed border-transparent" value={formData.email} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">Phone</label>
+                  <div className="relative">
+                    <Phone className="absolute left-4 top-4 text-gray-400 w-5 h-5" />
+                    <input disabled={!editMode} type="text" className={`w-full p-4 pl-12 rounded-xl font-medium transition-all ${editMode ? 'bg-gray-50 focus:bg-white border-transparent focus:ring-4 focus:ring-nykaa-50' : 'bg-transparent text-gray-900'}`} value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} placeholder="Add phone number" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">City</label>
+                  <div className="relative">
+                    <MapPin className="absolute left-4 top-4 text-gray-400 w-5 h-5" />
+                    <input disabled={!editMode} type="text" className={`w-full p-4 pl-12 rounded-xl font-medium transition-all ${editMode ? 'bg-gray-50 focus:bg-white border-transparent focus:ring-4 focus:ring-nykaa-50' : 'bg-transparent text-gray-900'}`} value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} placeholder="Add city" />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {editMode && (
+              <section className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
+                <h3 className="font-bold text-xl text-gray-900 mb-6 flex items-center gap-2"><Lock className="text-nykaa-500" /> Security</h3>
+                <div className="space-y-4">
+                  <input type="password" placeholder="Current Password" className="w-full bg-gray-50 rounded-xl p-4 font-medium focus:bg-white focus:ring-4 focus:ring-nykaa-50 transition-all border-transparent" value={formData.oldPassword} onChange={e => setFormData({ ...formData, oldPassword: e.target.value })} />
+                  <input type="password" placeholder="New Password" className="w-full bg-gray-50 rounded-xl p-4 font-medium focus:bg-white focus:ring-4 focus:ring-nykaa-50 transition-all border-transparent" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
+                </div>
+              </section>
+            )}
+
+            {editMode && (
+              <div className="flex gap-4">
+                <button onClick={handleSave} className="flex-1 bg-gradient-to-r from-nykaa-500 to-nykaa-600 text-white py-4 rounded-xl font-extrabold text-lg shadow-xl shadow-nykaa-500/30 hover:scale-[1.02] transition-transform active:scale-95 flex items-center justify-center gap-2">
+                  <Save className="w-5 h-5" /> Save Changes
+                </button>
+                <button onClick={() => setEditMode(false)} className="px-8 py-4 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition">Cancel</button>
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT COLUMN: Preferences */}
+          <div className="md:col-span-1">
+            <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 h-full">
+              <h3 className="font-bold text-xl text-gray-900 mb-6 flex items-center gap-2"><Bell className="text-nykaa-500" /> Preferences</h3>
+              <p className="text-sm text-gray-400 mb-8">Manage how you want to receive updates.</p>
+
+              <div className="space-y-8">
+                {[
+                  { title: 'Promotions', prefix: 'Offers' },
+                  { title: 'Newsletters', prefix: 'Newsletters' },
+                  { title: 'Orders', prefix: 'Orders' }
+                ].map((section) => (
+                  <div key={section.title}>
+                    <h4 className="font-bold text-gray-800 mb-3 text-sm uppercase tracking-wider">{section.title}</h4>
+                    <div className="space-y-2">
+                      {['email', 'sms', 'push'].map(channel => {
+                        const key = `${channel}${section.prefix}`;
+                        return (
+                          <label key={key} className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all ${editMode ? 'hover:bg-gray-50' : 'opacity-70 pointer-events-none'}`}>
+                            <span className="capitalize font-medium text-gray-600">{channel}</span>
+                            <div className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${formData[key] ? 'bg-nykaa-500' : 'bg-gray-200'}`}>
+                              <div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform duration-300 ${formData[key] ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                            </div>
+                            <input type="checkbox" className="hidden" checked={formData[key]} onChange={e => setFormData({ ...formData, [key]: e.target.checked })} />
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </main>
     </div>
   );
 };

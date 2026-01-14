@@ -50,6 +50,8 @@ public class ProfileController {
         Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isPresent()) {
             User user = userOpt.get();
+            
+            // 1. Update User Details
             if (request.getName() != null) user.setName(request.getName());
             if (user.getRole() == com.nykaa.notification_service.entity.Role.USER) {
                 if (request.getPhone() != null) user.setPhone(request.getPhone());
@@ -64,22 +66,36 @@ public class ProfileController {
                 }
                 user.setPassword(passwordEncoder.encode(request.getPassword()));
             }
-            userRepository.save(user);
 
-            // Update preferences
-            Preference pref = preferenceRepository.findByUserUserId(user.getUserId());
-            if (pref != null) {
-                pref.setEmailOffers(request.isEmailOffers());
-                pref.setSmsOffers(request.isSmsOffers());
-                pref.setPushOffers(request.isPushOffers());
-                pref.setEmailNewsletters(request.isEmailNewsletters());
-                pref.setSmsNewsletters(request.isSmsNewsletters());
-                pref.setPushNewsletters(request.isPushNewsletters());
-                pref.setEmailOrders(request.isEmailOrders());
-                pref.setSmsOrders(request.isSmsOrders());
-                pref.setPushOrders(request.isPushOrders());
-                preferenceRepository.save(pref);
+            // 2. Update Preferences (Attached to User)
+            Preference pref = user.getPreference();
+            if (pref == null) {
+                // Fallback for legacy users without preferences
+                pref = new Preference();
+                pref.setUser(user);
+                user.setPreference(pref);
             }
+
+            // Set granular fields
+            pref.setEmailOffers(request.isEmailOffers());
+            pref.setSmsOffers(request.isSmsOffers());
+            pref.setPushOffers(request.isPushOffers());
+            
+            pref.setEmailNewsletters(request.isEmailNewsletters());
+            pref.setSmsNewsletters(request.isSmsNewsletters());
+            pref.setPushNewsletters(request.isPushNewsletters());
+            
+            pref.setEmailOrders(request.isEmailOrders());
+            pref.setSmsOrders(request.isSmsOrders());
+            pref.setPushOrders(request.isPushOrders());
+
+            // SYNC MASTER SWITCHES (Logic from UserController)
+            pref.setOffers(pref.isEmailOffers() || pref.isSmsOffers() || pref.isPushOffers());
+            pref.setNewsletter(pref.isEmailNewsletters() || pref.isSmsNewsletters() || pref.isPushNewsletters());
+            pref.setOrderUpdates(pref.isEmailOrders() || pref.isSmsOrders() || pref.isPushOrders());
+
+            // 3. Save User (Cascades to Preference)
+            userRepository.save(user);
 
             return ResponseEntity.ok(user);
         }
