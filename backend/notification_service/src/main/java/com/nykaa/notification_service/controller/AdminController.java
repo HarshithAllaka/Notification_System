@@ -49,6 +49,25 @@ public class AdminController {
         return ResponseEntity.ok("User deleted successfully");
     }
 
+    @PostMapping("/users/upload-csv")
+    public ResponseEntity<String> uploadUsers(@RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        System.out.println("DEBUG: Entering uploadUsers endpoint");
+        if (file.isEmpty()) {
+            System.out.println("DEBUG: File is empty");
+            return ResponseEntity.badRequest().body("File is empty");
+        }
+        try {
+            System.out.println("DEBUG: Calling service uploadUsersFromCsv");
+            userService.uploadUsersFromCsv(file);
+            System.out.println("DEBUG: Upload success");
+            return ResponseEntity.ok("Users uploaded successfully");
+        } catch (Exception e) {
+            System.out.println("DEBUG: ERROR in upload: " + e.getMessage());
+            e.printStackTrace(); // Log to console
+            return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
+        }
+    }
+
     // --- NEW: Toggle Status Endpoint ---
     @PutMapping("/users/{id}/toggle-status")
     public ResponseEntity<String> toggleUserStatus(@PathVariable String id) {

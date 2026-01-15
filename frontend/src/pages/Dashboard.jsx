@@ -145,7 +145,7 @@ const Dashboard = () => {
   const handleUpload = async () => {
     if (!file) return toast.error("Select file!");
     const fd = new FormData(); fd.append('file', file);
-    try { await api.post('/users/upload-csv', fd, { headers: { 'Content-Type': 'multipart/form-data' } }); toast.success("Uploaded!"); fetchAllData(); } catch (err) { toast.error("Failed."); }
+    try { await api.post('/admin/users/upload-csv', fd, { headers: { 'Content-Type': 'multipart/form-data' } }); toast.success("Uploaded!"); fetchAllData(); } catch (err) { toast.error(err.response?.data || "Failed to upload CSV"); }
   };
 
   const handleCreateStaff = async (e) => {

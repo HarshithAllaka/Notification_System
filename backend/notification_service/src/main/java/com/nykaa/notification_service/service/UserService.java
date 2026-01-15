@@ -135,4 +135,83 @@ public class UserService {
         
         return user.isActive() ? "User Activated" : "User Deactivated";
     }
+
+    // --- CSV UPLOAD (ROBUST) ---
+    public void uploadUsersFromCsv(org.springframework.web.multipart.MultipartFile file) {
+        try (java.io.Reader reader = new java.io.InputStreamReader(file.getInputStream())) {
+            com.opencsv.CSVReader csvReader = new com.opencsv.CSVReader(reader);
+            List<String[]> rows = csvReader.readAll();
+            
+            if (rows.isEmpty()) throw new RuntimeException("Empty CSV file");
+
+            String[] headers = rows.get(0);
+            rows.remove(0); // Remove header row
+
+            // Map Header Names to Indices
+            int emailIdx = -1, phoneIdx = -1, nameIdx = -1, cityIdx = -1, activeIdx = -1, userIdIdx = -1, passwordIdx = -1;
+            
+            for (int i = 0; i < headers.length; i++) {
+                String h = headers[i].trim().toLowerCase().replace("_", ""); // Normalize: user_id -> userid
+                if (h.equals("email")) emailIdx = i;
+                else if (h.contains("phone")) phoneIdx = i;
+                else if (h.equals("name")) nameIdx = i;
+                else if (h.equals("city")) cityIdx = i;
+                else if (h.contains("active")) activeIdx = i;
+                else if (h.contains("userid")) userIdIdx = i;
+                else if (h.contains("pass")) passwordIdx = i;
+            }
+
+            if (emailIdx == -1) throw new RuntimeException("Missing required column: email");
+
+            for (String[] row : rows) {
+                try {
+                    // unexpected empty row check
+                    if (row.length <= emailIdx) continue;
+
+                    User user = new User();
+                    user.setEmail(row[emailIdx].trim());
+                    
+                    if (nameIdx != -1 && row.length > nameIdx) user.setName(row[nameIdx].trim());
+                    if (cityIdx != -1 && row.length > cityIdx) user.setCity(row[cityIdx].trim());
+                    
+                    if (userIdIdx != -1 && row.length > userIdIdx) user.setUserId(row[userIdIdx].trim());
+                    
+                    // Handle Phone
+                    if (phoneIdx != -1 && row.length > phoneIdx) {
+                        String rawPhone = row[phoneIdx].trim();
+                        if (rawPhone.contains("E")) {
+                             try {
+                                 java.math.BigDecimal bd = new java.math.BigDecimal(rawPhone);
+                                 user.setPhone(bd.toPlainString());
+                             } catch (Exception ignored) { user.setPhone(rawPhone); }
+                        } else {
+                            user.setPhone(rawPhone);
+                        }
+                    }
+
+                    // Handle Active
+                    if (activeIdx != -1 && row.length > activeIdx) {
+                        String activeStr = row[activeIdx].trim().toLowerCase();
+                        user.setActive(activeStr.equals("true") || activeStr.equals("1") || activeStr.equals("yes"));
+                    } else {
+                        user.setActive(true); // Default
+                    }
+
+                    // Handle Password
+                    if (passwordIdx != -1 && row.length > passwordIdx && !row[passwordIdx].trim().isEmpty()) {
+                        user.setPassword(row[passwordIdx].trim());
+                    } else {
+                        user.setPassword("Nykaa@123");
+                    }
+
+                    createUserManually(user);
+                } catch (Exception e) {
+                    System.err.println("Skipping row due to error: " + e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("CSV Parsing Error: " + e.getMessage());
+        }
+    }
 }
