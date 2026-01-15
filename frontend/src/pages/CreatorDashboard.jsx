@@ -393,10 +393,6 @@ const CreatorDashboard = () => {
                     <label className="text-xs font-bold text-blue-600 uppercase mb-2 block">Schedule (Optional)</label>
                     <input type="datetime-local" className="w-full bg-white border border-blue-200 rounded-lg p-2 text-sm" value={postData.scheduledAt} onChange={e => setPostData({ ...postData, scheduledAt: e.target.value })} />
                   </div>
-                  <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                    <label className="text-xs font-bold text-blue-600 uppercase mb-2 block">Schedule (Optional)</label>
-                    <input type="datetime-local" className="w-full bg-white border border-blue-200 rounded-lg p-2 text-sm" value={postData.scheduledAt} onChange={e => setPostData({ ...postData, scheduledAt: e.target.value })} />
-                  </div>
                   <div className="flex gap-2">
                     {editingPost && <button type="button" onClick={() => { setEditingPost(null); setPostData({ title: '', content: '', scheduledAt: '' }); setSelectedNewsletterId(null); }} className="w-1/3 bg-gray-100 text-gray-600 py-4 rounded-xl font-bold hover:bg-gray-200 transition">Cancel</button>}
                     <button className="w-full bg-blue-600 text-white p-4 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200">{editingPost ? 'Update' : (postData.scheduledAt ? 'Schedule' : 'Publish Now')}</button>
@@ -616,6 +612,11 @@ const CreatorDashboard = () => {
                           </>
                         )}
                       </div>
+                    </div>
+
+                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                      <label className="text-xs font-bold text-blue-600 uppercase mb-2 block">Schedule (Optional)</label>
+                      <input type="datetime-local" className="w-full bg-white border border-blue-200 rounded-lg p-2 text-sm" value={campaignData.scheduledAt} onChange={e => setCampaignData({ ...campaignData, scheduledAt: e.target.value })} />
                     </div>
 
                     <div className="flex gap-2">
