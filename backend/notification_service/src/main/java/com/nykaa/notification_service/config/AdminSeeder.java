@@ -26,6 +26,12 @@ public class AdminSeeder implements CommandLineRunner {
             admin.setActive(true);
             userRepository.save(admin);
             System.out.println("Default Admin account created: admin@nykaa.com / admin123");
+        } else {
+            // FORCE RESET PASSWORD for recovery
+            User admin = userRepository.findByEmail("admin@nykaa.com").get();
+            admin.setPassword(passwordEncoder.encode("admin123"));
+            userRepository.save(admin);
+            System.out.println("Admin password reset to default: admin@nykaa.com / admin123");
         }
     }
 }

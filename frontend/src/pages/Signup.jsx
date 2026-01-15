@@ -14,6 +14,15 @@ const Signup = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Validation
+    if (!/^[0-9]{10}$/.test(formData.phone)) {
+      return toast.error("Phone number must be exactly 10 digits");
+    }
+    if (formData.password.length < 6) {
+      return toast.error("Password must be at least 6 characters");
+    }
+
     setLoading(true);
     try {
       await api.post('/auth/register', formData);
@@ -120,10 +129,13 @@ const Signup = () => {
                   <Phone className="absolute left-4 top-3.5 text-gray-500 group-focus-within:text-nykaa-500 transition-colors w-5 h-5" />
                   <input
                     type="text"
-                    placeholder="Phone"
+                    placeholder="Phone (10 digits)"
                     className="w-full bg-black/20 border border-white/10 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-nykaa-500 focus:ring-1 focus:ring-nykaa-500 transition-all font-medium"
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setFormData({ ...formData, phone: val });
+                    }}
                     required
                   />
                 </div>

@@ -35,6 +35,16 @@ public class NewsletterController {
         return ResponseEntity.ok(newsletterRepository.save(newsletter));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateNewsletter(@PathVariable Long id, @RequestBody Newsletter updatedNewsletter) {
+        return newsletterRepository.findById(id).map(existing -> {
+            existing.setTitle(updatedNewsletter.getTitle());
+            existing.setDescription(updatedNewsletter.getDescription());
+            newsletterRepository.save(existing);
+            return ResponseEntity.ok(existing);
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
     @GetMapping("/all")
     public ResponseEntity<List<Newsletter>> getAllNewsletters() {
         return ResponseEntity.ok(newsletterRepository.findAll());
@@ -165,6 +175,24 @@ public class NewsletterController {
     @GetMapping("/{id}/posts")
     public ResponseEntity<List<NewsletterPost>> getPosts(@PathVariable Long id) {
         return ResponseEntity.ok(postRepository.findByNewsletterId(id));
+    }
+
+    @PutMapping("/posts/{postId}")
+    public ResponseEntity<?> updatePost(@PathVariable Long postId, @RequestBody NewsletterPost updatedPost) {
+        java.util.Optional<NewsletterPost> existingOpt = postRepository.findById(postId);
+        if (existingOpt.isPresent()) {
+            NewsletterPost existing = existingOpt.get();
+            existing.setTitle(updatedPost.getTitle());
+            existing.setContent(updatedPost.getContent());
+            if (updatedPost.getScheduledAt() != null) {
+                existing.setScheduledAt(updatedPost.getScheduledAt());
+                existing.setStatus("SCHEDULED");
+            }
+            postRepository.save(existing);
+            return ResponseEntity.ok(existing);
+        } else {
+            return ResponseEntity.badRequest().body("Post not found");
+        }
     }
 
     @DeleteMapping("/posts/{postId}")

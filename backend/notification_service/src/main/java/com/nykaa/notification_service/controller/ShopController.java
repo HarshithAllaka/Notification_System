@@ -38,6 +38,19 @@ public class ShopController {
         return ResponseEntity.ok("Deleted");
     }
 
+    @PutMapping("/products/{id}")
+    public ResponseEntity<?> updateProduct(@PathVariable Long id, @RequestBody Product updatedProduct) {
+        return productRepository.findById(id).map(existing -> {
+            existing.setName(updatedProduct.getName());
+            existing.setDescription(updatedProduct.getDescription());
+            existing.setPrice(updatedProduct.getPrice());
+            existing.setImageUrl(updatedProduct.getImageUrl());
+            // Preserve category if you had one, or update it. For now, Product entity seems simple.
+            productRepository.save(existing);
+            return ResponseEntity.ok(existing);
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
     // --- ORDERS ---
     @GetMapping("/orders/all")
     public ResponseEntity<List<Orders>> getAllOrders() {

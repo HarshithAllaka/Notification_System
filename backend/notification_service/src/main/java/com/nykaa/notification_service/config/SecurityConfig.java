@@ -40,6 +40,7 @@ public class SecurityConfig {
                 
                 // 3. Campaigns accessible by all staff
                 .requestMatchers("/api/campaigns/**").hasAnyAuthority("CREATOR", "VIEWER", "ADMIN")
+                .requestMatchers("/api/campaigns/history").hasAnyAuthority("CREATOR", "VIEWER", "ADMIN")
                 
                 .requestMatchers("/api/users/**").authenticated()
                 .anyRequest().authenticated()

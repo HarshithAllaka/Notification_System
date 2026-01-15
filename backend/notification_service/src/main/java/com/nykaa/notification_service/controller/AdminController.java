@@ -27,8 +27,14 @@ public class AdminController {
         return ResponseEntity.ok(userService.getAllUsers());
     }
 
-    @PostMapping("/users/create")
-    public ResponseEntity<User> createUser(@RequestBody User user) {
+    @PostMapping("/users")
+    public ResponseEntity<?> createUser(@RequestBody User user) {
+        if (user.getEmail() == null || userRepository.findByEmail(user.getEmail()).isPresent()) {
+            return ResponseEntity.badRequest().body("Email already exists or is invalid");
+        }
+        if (user.getPhone() != null && !user.getPhone().matches("\\d{10}")) {
+            return ResponseEntity.badRequest().body("Phone number must be exactly 10 digits");
+        }
         return ResponseEntity.ok(userService.createUserManually(user));
     }
 
@@ -61,7 +67,10 @@ public class AdminController {
     }
 
     @PostMapping("/create-staff")
-    public ResponseEntity<String> createStaff(@RequestBody User staff) {
+    public ResponseEntity<?> createStaff(@RequestBody User staff) {
+        if (userRepository.findByEmail(staff.getEmail()).isPresent()) {
+            return ResponseEntity.badRequest().body("Email already in use");
+        }
         // Set defaults for staff
         staff.setUserId(java.util.UUID.randomUUID().toString());
         staff.setActive(true);

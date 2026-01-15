@@ -27,6 +27,9 @@ const Dashboard = () => {
   // UI States
   const [searchTerm, setSearchTerm] = useState('');
   const [editingUser, setEditingUser] = useState(null);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [editingNewsletter, setEditingNewsletter] = useState(null);
+  const [editingCampaign, setEditingCampaign] = useState(null);
   const [file, setFile] = useState(null);
   const [filterType, setFilterType] = useState('ALL');
 
@@ -49,6 +52,7 @@ const Dashboard = () => {
   // Newsletter View State
   const [viewingNewsletter, setViewingNewsletter] = useState(null);
   const [newsletterPosts, setNewsletterPosts] = useState([]);
+  const [editingPost, setEditingPost] = useState(null);
 
   // --- HANDLERS ---
   const handleViewPosts = async (newsletter) => {
@@ -66,6 +70,18 @@ const Dashboard = () => {
       toast.success("Issue deleted");
       setNewsletterPosts(newsletterPosts.filter(p => p.id !== postId));
     } catch (err) { toast.error("Failed"); }
+  };
+
+  const handleEditPost = (post) => {
+    setEditingPost(post);
+    setPostData({
+      title: post.title,
+      content: post.content,
+      scheduledAt: post.scheduledAt ? post.scheduledAt.slice(0, 16) : '' // Format for datetime-local
+    });
+    setSelectedNewsletterId(viewingNewsletter.id);
+    setViewingNewsletter(null); // Close modal to show form
+    // Optional: scroll to form
   };
 
   useEffect(() => { fetchAllData(); }, []);
@@ -94,11 +110,26 @@ const Dashboard = () => {
   // --- HANDLERS (Same login as before, just restyled UI) ---
   const handleUserSubmit = async (e) => {
     e.preventDefault();
+    // Validation
+    const phoneRegex = /^[0-9]{10}$/;
+    if (userData.phone && !phoneRegex.test(userData.phone)) {
+      return toast.error("Phone number must be exactly 10 digits");
+    }
+    if (!editingUser && !userData.password) {
+      return toast.error("Password is required for new users");
+    }
+
     try {
-      if (editingUser) await api.put(`/admin/users/${editingUser}`, userData);
-      else await api.post('/admin/users/create', userData);
-      toast.success(editingUser ? "User Updated!" : "User Created!");
-      setUserData({ name: '', email: '', password: '', city: '', phone: '' }); setEditingUser(null); fetchAllData();
+      if (editingUser) {
+        await api.put(`/admin/users/${userData.userId}`, userData);
+        toast.success("User Updated");
+      } else {
+        await api.post('/admin/users', userData); // Updated endpoint
+        toast.success("User Created");
+      }
+      setUserData({ name: '', email: '', password: '', phone: '', city: '' });
+      setEditingUser(null);
+      fetchAllData();
     } catch (err) { toast.error("Operation failed."); }
   };
 
@@ -125,11 +156,17 @@ const Dashboard = () => {
   const handleAddProduct = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/shop/products', productData);
-      toast.success("Product Added to Shop!");
-      setProductData({ name: '', price: '', description: '' });
+      if (editingProduct) {
+        await api.put(`/shop/products/${editingProduct.id}`, productData);
+        toast.success("Product Updated!");
+        setEditingProduct(null);
+      } else {
+        await api.post('/shop/products', productData);
+        toast.success("Product Added to Shop!");
+      }
+      setProductData({ name: '', price: '', description: '', imageUrl: '' });
       fetchAllData();
-    } catch (err) { toast.error("Failed to add product."); }
+    } catch (err) { toast.error("Failed to save product."); }
   };
 
   const handleOrderStatus = async (orderId, newStatus) => {
@@ -143,11 +180,17 @@ const Dashboard = () => {
   const handleCreateNewsletter = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/newsletters/create', newsletterData);
-      toast.success("Newsletter Created!");
+      if (editingNewsletter) {
+        await api.put(`/newsletters/${editingNewsletter.id}`, newsletterData);
+        toast.success("Newsletter Updated!");
+        setEditingNewsletter(null);
+      } else {
+        await api.post('/newsletters/create', newsletterData);
+        toast.success("Newsletter Created!");
+      }
       setNewsletterData({ title: '', description: '' });
       fetchAllData();
-    } catch (err) { toast.error("Failed to create newsletter"); }
+    } catch (err) { toast.error("Failed to save newsletter"); }
   };
 
   const handlePublishPost = async (e) => {
@@ -160,13 +203,19 @@ const Dashboard = () => {
     };
 
     try {
-      await api.post(`/newsletters/${selectedNewsletterId}/publish`, payload);
-      if (payload.scheduledAt) toast.info("Post Scheduled Successfully!");
-      else toast.success("Post Published to Subscribers!");
+      if (editingPost) {
+        await api.put(`/newsletters/posts/${editingPost.id}`, payload);
+        toast.success("Post Updated Successfully!");
+        setEditingPost(null);
+      } else {
+        await api.post(`/newsletters/${selectedNewsletterId}/publish`, payload);
+        if (payload.scheduledAt) toast.info("Post Scheduled Successfully!");
+        else toast.success("Post Published to Subscribers!");
+      }
 
       setPostData({ title: '', content: '', scheduledAt: '' });
       setSelectedNewsletterId(null);
-    } catch (err) { toast.error("Publishing failed."); }
+    } catch (err) { toast.error("Operation failed."); }
   };
 
   // --- CAMPAIGN HANDLERS (Missing Fix) ---
@@ -174,8 +223,14 @@ const Dashboard = () => {
     e.preventDefault();
     const payload = { ...campaignData, scheduledAt: campaignData.scheduledAt ? campaignData.scheduledAt + ':00' : null };
     try {
-      await api.post('/campaigns/create', payload);
-      toast.success("Promotion Launched!");
+      if (editingCampaign) {
+        await api.put(`/campaigns/${editingCampaign.id}`, payload);
+        toast.success("Promotion Updated!");
+        setEditingCampaign(null);
+      } else {
+        await api.post('/campaigns/create', payload);
+        toast.success("Promotion Launched!");
+      }
       setCampaignData({ name: '', type: 'Promotion Offers', content: '', schedule: '', targetCities: [], channels: ['EMAIL', 'SMS', 'PUSH'], scheduledAt: '' });
       fetchAllData();
     } catch (err) { toast.error("Operation failed."); }
@@ -329,7 +384,10 @@ const Dashboard = () => {
                   <input type="password" className="w-full bg-gray-50 border-transparent focus:bg-white focus:border-nykaa-200 focus:ring-4 focus:ring-nykaa-50 rounded-xl p-4 transition-all duration-200 font-medium" value={userData.password} onChange={e => setUserData({ ...userData, password: e.target.value })} placeholder="••••••••" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <input type="text" placeholder="Phone" className="bg-gray-50 border-transparent focus:bg-white focus:border-nykaa-200 focus:ring-4 focus:ring-nykaa-50 rounded-xl p-4 font-medium" value={userData.phone} onChange={e => setUserData({ ...userData, phone: e.target.value })} />
+                  <input type="text" placeholder="Phone (10 digits)" className="bg-gray-50 border-transparent focus:bg-white focus:border-nykaa-200 focus:ring-4 focus:ring-nykaa-50 rounded-xl p-4 font-medium" value={userData.phone} onChange={e => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setUserData({ ...userData, phone: val });
+                  }} />
                   <input type="text" placeholder="City" className="bg-gray-50 border-transparent focus:bg-white focus:border-nykaa-200 focus:ring-4 focus:ring-nykaa-50 rounded-xl p-4 font-medium" value={userData.city} onChange={e => setUserData({ ...userData, city: e.target.value })} />
                 </div>
                 <button className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold hover:bg-black transition shadow-lg active:scale-95">{editingUser ? 'Save Updates' : 'Create Account'}</button>
@@ -437,14 +495,17 @@ const Dashboard = () => {
             <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 h-fit">
               <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-nykaa-100 flex items-center justify-center text-nykaa-600"><ShoppingBag size={20} /></div>
-                Add Product
+                {editingProduct ? 'Edit Product' : 'Add Product'}
               </h3>
               <form onSubmit={handleAddProduct} className="space-y-4">
                 <input type="text" placeholder="Product Name" className="w-full bg-gray-50 rounded-xl p-4 font-medium" value={productData.name} onChange={e => setProductData({ ...productData, name: e.target.value })} required />
                 <input type="number" placeholder="Price (₹)" className="w-full bg-gray-50 rounded-xl p-4 font-medium" value={productData.price} onChange={e => setProductData({ ...productData, price: e.target.value })} required />
                 <input type="text" placeholder="Image URL (Optional)" className="w-full bg-gray-50 rounded-xl p-4 font-medium" value={productData.imageUrl || ''} onChange={e => setProductData({ ...productData, imageUrl: e.target.value })} />
                 <textarea placeholder="Description" className="w-full bg-gray-50 rounded-xl p-4 font-medium h-32 resize-none" value={productData.description} onChange={e => setProductData({ ...productData, description: e.target.value })} />
-                <button className="w-full bg-nykaa-500 text-white py-4 rounded-xl font-bold hover:bg-nykaa-600 transition shadow-lg shadow-nykaa-500/30">Add to Shop</button>
+                <div className="flex gap-2">
+                  {editingProduct && <button type="button" onClick={() => { setEditingProduct(null); setProductData({ name: '', price: '', description: '', imageUrl: '' }); }} className="w-1/3 bg-gray-100 text-gray-600 py-4 rounded-xl font-bold hover:bg-gray-200 transition">Cancel</button>}
+                  <button className="w-full bg-nykaa-500 text-white py-4 rounded-xl font-bold hover:bg-nykaa-600 transition shadow-lg shadow-nykaa-500/30">{editingProduct ? 'Update Product' : 'Add to Shop'}</button>
+                </div>
               </form>
             </div>
             <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 lg:col-span-2 overflow-hidden p-6">
@@ -455,7 +516,10 @@ const Dashboard = () => {
                       <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-gray-300 group-hover:text-nykaa-500 transition shadow-sm overflow-hidden">
                         {p.imageUrl ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" /> : <ShoppingBag size={24} />}
                       </div>
-                      <button onClick={() => handleDelete('/shop/products', p.id)} className="text-gray-300 hover:text-red-500 transition"><Trash2 size={18} /></button>
+                      <div className="flex gap-1">
+                        <button onClick={() => { setEditingProduct(p); setProductData(p); }} className="text-gray-300 hover:text-blue-500 transition p-1"><Edit2 size={18} /></button>
+                        <button onClick={() => handleDelete('/shop/products', p.id)} className="text-gray-300 hover:text-red-500 transition p-1"><Trash2 size={18} /></button>
+                      </div>
                     </div>
                     <h4 className="font-bold text-lg text-gray-900 mb-1">{p.name}</h4>
                     <p className="text-sm text-gray-500 line-clamp-2 mb-4 h-10">{p.description}</p>
@@ -497,15 +561,18 @@ const Dashboard = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
             <div className="space-y-8">
               <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
-                <h3 className="font-bold text-xl mb-6">Create Newsletter</h3>
+                <h3 className="font-bold text-xl mb-6">{editingNewsletter ? 'Edit Newsletter' : 'Create Newsletter'}</h3>
                 <form onSubmit={handleCreateNewsletter} className="space-y-4">
                   <input type="text" placeholder="Title" className="w-full bg-gray-50 rounded-xl p-4 font-medium" value={newsletterData.title} onChange={e => setNewsletterData({ ...newsletterData, title: e.target.value })} required />
                   <textarea placeholder="Description" className="w-full bg-gray-50 rounded-xl p-4 font-medium h-24 resize-none" value={newsletterData.description} onChange={e => setNewsletterData({ ...newsletterData, description: e.target.value })} />
-                  <button className="w-full bg-gray-900 text-white p-4 rounded-xl font-bold hover:bg-black transition">Create</button>
+                  <div className="flex gap-2">
+                    {editingNewsletter && <button type="button" onClick={() => { setEditingNewsletter(null); setNewsletterData({ title: '', description: '' }); }} className="w-1/3 bg-gray-100 text-gray-600 py-4 rounded-xl font-bold hover:bg-gray-200 transition">Cancel</button>}
+                    <button className="w-full bg-gray-900 text-white p-4 rounded-xl font-bold hover:bg-black transition">{editingNewsletter ? 'Update' : 'Create'}</button>
+                  </div>
                 </form>
               </div>
               <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
-                <h3 className="font-bold text-xl mb-6 flex items-center gap-2"><Send className="w-5 h-5 text-blue-500" /> Publish Issue</h3>
+                <h3 className="font-bold text-xl mb-6 flex items-center gap-2"><Send className="w-5 h-5 text-blue-500" /> {editingPost ? 'Edit Publication' : 'Publish'}</h3>
                 <form onSubmit={handlePublishPost} className="space-y-4">
                   <select className="w-full bg-gray-50 rounded-xl p-4 font-medium" value={selectedNewsletterId || ''} onChange={e => setSelectedNewsletterId(e.target.value)} required>
                     <option value="" disabled>Select Newsletter</option>
@@ -517,7 +584,10 @@ const Dashboard = () => {
                     <label className="text-xs font-bold text-blue-600 uppercase mb-2 block">Schedule (Optional)</label>
                     <input type="datetime-local" className="w-full bg-white border border-blue-200 rounded-lg p-2 text-sm" value={postData.scheduledAt} onChange={e => setPostData({ ...postData, scheduledAt: e.target.value })} />
                   </div>
-                  <button className="w-full bg-blue-600 text-white p-4 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200">{postData.scheduledAt ? 'Schedule' : 'Publish Now'}</button>
+                  <div className="flex gap-2">
+                    {editingPost && <button type="button" onClick={() => { setEditingPost(null); setPostData({ title: '', content: '', scheduledAt: '' }); setSelectedNewsletterId(null); }} className="w-1/3 bg-gray-100 text-gray-600 py-4 rounded-xl font-bold hover:bg-gray-200 transition">Cancel</button>}
+                    <button className="w-full bg-blue-600 text-white p-4 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200">{editingPost ? 'Update' : (postData.scheduledAt ? 'Schedule' : 'Publish Now')}</button>
+                  </div>
                 </form>
               </div>
             </div>
@@ -528,7 +598,10 @@ const Dashboard = () => {
                   <div key={n.id} className="p-6 bg-gray-50 rounded-3xl hover:bg-white hover:shadow-lg transition-all duration-300 border border-transparent hover:border-gray-100 group">
                     <div className="flex justify-between items-start mb-2">
                       <div>
-                        <h4 className="font-bold text-gray-900 text-lg">{n.title}</h4>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-gray-900 text-lg">{n.title}</h4>
+                          <button onClick={() => { setEditingNewsletter(n); setNewsletterData(n); }} className="p-1 text-gray-300 hover:text-blue-500 transition opacity-0 group-hover:opacity-100"><Edit2 size={14} /></button>
+                        </div>
                         <span className="text-xs font-mono text-gray-400">ID: {n.id}</span>
                       </div>
                       <button onClick={() => handleViewPosts(n)} className="px-4 py-2 bg-white text-blue-600 text-xs font-bold rounded-xl opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-blue-50">
@@ -576,7 +649,10 @@ const Dashboard = () => {
                             <td className="p-4 text-sm text-gray-500">{p.sentAt ? new Date(p.sentAt).toLocaleString() : 'Scheduled'}</td>
                             <td className="p-4 font-mono text-xs font-bold text-gray-600">{p.recipientsCount || 0} Sent</td>
                             <td className="p-4 pr-0 text-right">
-                              <button onClick={() => handleDeletePost(p.id)} className="p-2 bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition"><Trash2 size={16} /></button>
+                              <div className="flex justify-end gap-1">
+                                <button onClick={() => handleEditPost(p)} className="p-2 bg-gray-50 hover:bg-blue-50 text-gray-400 hover:text-blue-500 rounded-lg transition"><Edit2 size={16} /></button>
+                                <button onClick={() => handleDeletePost(p.id)} className="p-2 bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition"><Trash2 size={16} /></button>
+                              </div>
                             </td>
                           </tr>
                         )
@@ -616,7 +692,8 @@ const Dashboard = () => {
                           ))}
                         </div>
                       </div>
-                      <div className="flex gap-3 opacity-60 group-hover:opacity-100 transition-opacity">
+                      <div className="flex gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => { setEditingCampaign(c); setCampaignData({ ...c, name: c.campaignName, type: 'Promotion Offers', channels: c.channels || [], targetCities: c.targetCities || [] }); }} className="p-2 bg-white text-blue-500 rounded-xl hover:bg-blue-50 transition border border-gray-100"><Edit2 size={18} /></button>
                         <button onClick={() => handleViewReport(c)} className="bg-white border border-gray-200 px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 transition">Reports</button>
                         <button onClick={() => handleDelete('/campaigns', c.id)} className="p-2 bg-white text-red-500 rounded-xl hover:bg-red-50 transition"><Trash2 size={20} /></button>
                       </div>
@@ -636,7 +713,7 @@ const Dashboard = () => {
                   <div className="w-8 h-8 rounded-lg bg-pink-50 flex items-center justify-center text-pink-600">
                     <Tag className="w-5 h-5" />
                   </div>
-                  Create New Offer
+                  {editingCampaign ? 'Edit Offer' : 'Create New Offer'}
                 </h3>
 
                 <form onSubmit={(e) => { e.preventDefault(); handleCampaignSubmit(e); }} className="space-y-5">
@@ -720,104 +797,117 @@ const Dashboard = () => {
                     </div>
                   </div>
 
-                  <button className="w-full bg-gradient-to-r from-nykaa-600 to-brand-purple text-white py-4 rounded-xl font-bold shadow-lg hover:shadow-nykaa-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex justify-center items-center gap-2">
-                    <Send className="w-4 h-4" /> Launch Promotion
-                  </button>
+                  <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                    <label className="text-xs font-bold text-blue-600 uppercase mb-2 block">Schedule (Optional)</label>
+                    <input type="datetime-local" className="w-full bg-white border border-blue-200 rounded-lg p-2 text-sm" value={campaignData.scheduledAt} onChange={e => setCampaignData({ ...campaignData, scheduledAt: e.target.value })} />
+                  </div>
+
+
+                  <div className="flex gap-2">
+                    {editingCampaign && <button type="button" onClick={() => { setEditingCampaign(null); setCampaignData({ name: '', type: 'Promotion Offers', content: '', schedule: '', targetCities: [], channels: ['EMAIL', 'SMS', 'PUSH'], scheduledAt: '' }); }} className="w-1/3 bg-gray-100 text-gray-600 py-4 rounded-xl font-bold hover:bg-gray-200 transition">Cancel</button>}
+                    <button className="w-full bg-gradient-to-r from-nykaa-600 to-brand-purple text-white py-4 rounded-xl font-bold shadow-lg hover:shadow-nykaa-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex justify-center items-center gap-2">
+                      <Send className="w-4 h-4" /> {editingCampaign ? 'Update' : 'Launch'}
+                    </button>
+                  </div>
                 </form>
               </div>
             </div>
-          </div>
+          </div >
         )}
 
         {/* --- ANALYTICS TAB --- */}
-        {activeTab === 'ANALYTICS' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
-            <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
-              <h3 className="font-bold text-xl mb-6 text-center">User Demographics</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie data={[
-                    { name: 'Customers', value: users.length, color: '#fc2779' },
-                    { name: 'Admin', value: staff.filter(s => s.role === 'ADMIN').length, color: '#8b5cf6' },
-                    { name: 'Staff', value: staff.filter(s => s.role !== 'ADMIN').length, color: '#10b981' }
-                  ]} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
-                    {[
+        {
+          activeTab === 'ANALYTICS' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+              <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
+                <h3 className="font-bold text-xl mb-6 text-center">User Demographics</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie data={[
                       { name: 'Customers', value: users.length, color: '#fc2779' },
                       { name: 'Admin', value: staff.filter(s => s.role === 'ADMIN').length, color: '#8b5cf6' },
                       { name: 'Staff', value: staff.filter(s => s.role !== 'ADMIN').length, color: '#10b981' }
-                    ].map((e, i) => <Cell key={i} fill={e.color} />)}
-                  </Pie>
-                  <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex justify-center gap-4 mt-4">
-                <div className="flex items-center gap-2 text-sm font-bold text-gray-500"><div className="w-3 h-3 rounded-full bg-nykaa-500"></div>Customers</div>
-                <div className="flex items-center gap-2 text-sm font-bold text-gray-500"><div className="w-3 h-3 rounded-full bg-purple-500"></div>Admin</div>
-                <div className="flex items-center gap-2 text-sm font-bold text-gray-500"><div className="w-3 h-3 rounded-full bg-green-500"></div>Staff</div>
+                    ]} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
+                      {[
+                        { name: 'Customers', value: users.length, color: '#fc2779' },
+                        { name: 'Admin', value: staff.filter(s => s.role === 'ADMIN').length, color: '#8b5cf6' },
+                        { name: 'Staff', value: staff.filter(s => s.role !== 'ADMIN').length, color: '#10b981' }
+                      ].map((e, i) => <Cell key={i} fill={e.color} />)}
+                    </Pie>
+                    <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex justify-center gap-4 mt-4">
+                  <div className="flex items-center gap-2 text-sm font-bold text-gray-500"><div className="w-3 h-3 rounded-full bg-nykaa-500"></div>Customers</div>
+                  <div className="flex items-center gap-2 text-sm font-bold text-gray-500"><div className="w-3 h-3 rounded-full bg-purple-500"></div>Admin</div>
+                  <div className="flex items-center gap-2 text-sm font-bold text-gray-500"><div className="w-3 h-3 rounded-full bg-green-500"></div>Staff</div>
+                </div>
+              </div>
+
+              {/* Promotion Channel Distribution */}
+              <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
+                <h3 className="font-bold text-xl mb-2 text-center">Promotions Activity</h3>
+                <p className="text-center text-xs text-gray-400 font-bold uppercase mb-6">Breakdown by Channel</p>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={[
+                    { name: 'Email', count: campaigns.filter(c => c.type === 'Promotion Offers' && c.channels && c.channels.includes('EMAIL')).length },
+                    { name: 'SMS', count: campaigns.filter(c => c.type === 'Promotion Offers' && c.channels && c.channels.includes('SMS')).length },
+                    { name: 'Push', count: campaigns.filter(c => c.type === 'Promotion Offers' && c.channels && c.channels.includes('PUSH')).length }
+                  ]}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 12, fontWeight: 'bold' }} dy={10} />
+                    <Tooltip cursor={{ fill: '#f9fafb' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
+                    <Bar dataKey="count" fill="#fc2779" radius={[10, 10, 0, 0]} barSize={50}>
+                      <Cell fill="#f59e0b" /> {/* Email - Amber */}
+                      <Cell fill="#3b82f6" /> {/* SMS - Blue */}
+                      <Cell fill="#a855f7" /> {/* Push - Purple */}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
-
-            {/* Promotion Channel Distribution */}
-            <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
-              <h3 className="font-bold text-xl mb-2 text-center">Promotions Activity</h3>
-              <p className="text-center text-xs text-gray-400 font-bold uppercase mb-6">Breakdown by Channel</p>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={[
-                  { name: 'Email', count: campaigns.filter(c => c.type === 'Promotion Offers' && c.channels && c.channels.includes('EMAIL')).length },
-                  { name: 'SMS', count: campaigns.filter(c => c.type === 'Promotion Offers' && c.channels && c.channels.includes('SMS')).length },
-                  { name: 'Push', count: campaigns.filter(c => c.type === 'Promotion Offers' && c.channels && c.channels.includes('PUSH')).length }
-                ]}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 12, fontWeight: 'bold' }} dy={10} />
-                  <Tooltip cursor={{ fill: '#f9fafb' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
-                  <Bar dataKey="count" fill="#fc2779" radius={[10, 10, 0, 0]} barSize={50}>
-                    <Cell fill="#f59e0b" /> {/* Email - Amber */}
-                    <Cell fill="#3b82f6" /> {/* SMS - Blue */}
-                    <Cell fill="#a855f7" /> {/* Push - Purple */}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-      </main>
+          )
+        }
+      </main >
 
       {/* MODAL */}
-      {selectedCampaign && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center p-4 z-50 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden scale-95 animate-in zoom-in duration-200">
-            <div className="bg-gray-900 text-white p-6 flex justify-between items-center">
-              <h3 className="font-bold text-xl">Campaign Report</h3>
-              <button onClick={() => setSelectedCampaign(null)} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition">✕</button>
-            </div>
-            <div className="p-0 max-h-96 overflow-y-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-gray-50 sticky top-0"><tr className="text-xs uppercase text-gray-500"><th className="p-4">Recipient</th><th className="p-4">Channels</th><th className="p-4">Status</th></tr></thead>
-                <tbody className="divide-y divide-gray-100">
-                  {recipients.map((r, i) => (
-                    <tr key={i}>
-                      <td className="p-4"><div className="font-bold text-gray-900">{r.name}</div><div className="text-xs text-gray-400">{r.email}</div></td>
-                      <td className="p-4">
-                        <div className="flex gap-1">
-                          {r.channels && r.channels.map(ch => (
-                            <span key={ch} className="px-1.5 py-0.5 rounded text-[10px] font-bold border bg-gray-50 text-gray-500 border-gray-200">{ch}</span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="p-4"><span className="text-green-600 font-bold bg-green-50 px-2 py-1 rounded-md text-xs">{r.status}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end">
-              <button onClick={downloadCSV} className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-green-700 shadow-lg active:scale-95 transition">Download CSV Report</button>
+      {
+        selectedCampaign && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center p-4 z-50 animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden scale-95 animate-in zoom-in duration-200">
+              <div className="bg-gray-900 text-white p-6 flex justify-between items-center">
+                <h3 className="font-bold text-xl">Campaign Report</h3>
+                <button onClick={() => setSelectedCampaign(null)} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition">✕</button>
+              </div>
+              <div className="p-0 max-h-96 overflow-y-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-gray-50 sticky top-0"><tr className="text-xs uppercase text-gray-500"><th className="p-4">Recipient</th><th className="p-4">Channels</th><th className="p-4">Status</th></tr></thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {recipients.map((r, i) => (
+                      <tr key={i}>
+                        <td className="p-4"><div className="font-bold text-gray-900">{r.name}</div><div className="text-xs text-gray-400">{r.email}</div></td>
+                        <td className="p-4">
+                          <div className="flex gap-1">
+                            {r.channels && r.channels.map(ch => (
+                              <span key={ch} className="px-1.5 py-0.5 rounded text-[10px] font-bold border bg-gray-50 text-gray-500 border-gray-200">{ch}</span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-4"><span className="text-green-600 font-bold bg-green-50 px-2 py-1 rounded-md text-xs">{r.status}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end">
+                <button onClick={downloadCSV} className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-green-700 shadow-lg active:scale-95 transition">Download CSV Report</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
-    </div>
+    </div >
   );
 };
 
